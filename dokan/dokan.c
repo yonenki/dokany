@@ -643,14 +643,49 @@ BOOL DOKANAPI DokanUnregisterWaitForFileSystemClosed(
       WaitHandle, WaitForCallbacks ? INVALID_HANDLE_VALUE : NULL);
 }
 
+BOOL DOKANAPI DokanRequestUnmount(_In_ DOKAN_HANDLE DokanInstance) {
+  DOKAN_INSTANCE *instance = (DOKAN_INSTANCE *)DokanInstance;
+  BOOL result = FALSE;
+  if (!instance) {
+    SetLastError(ERROR_INVALID_HANDLE);
+    return FALSE;
+  }
+
+  EnterCriticalSection(&instance->CriticalSection);
+  if (WaitForSingleObject(instance->DeviceClosedWaitHandle, 0) ==
+      WAIT_OBJECT_0) {
+    result = TRUE;
+    goto cleanup;
+  }
+
+  if (instance->FileSystemStopped) {
+    result = TRUE;
+    goto cleanup;
+  }
+
+  if (instance->DeviceName[0] == L'\0') {
+    SetLastError(ERROR_NOT_READY);
+    goto cleanup;
+  }
+
+  instance->FileSystemStopped = TRUE;
+  result = SendReleaseIRP(instance->DeviceName);
+  if (!result) {
+    instance->FileSystemStopped = FALSE;
+  }
+
+cleanup:
+  LeaveCriticalSection(&instance->CriticalSection);
+  return result;
+}
+
 VOID DOKANAPI DokanCloseHandle(_In_ DOKAN_HANDLE DokanInstance) {
   DOKAN_INSTANCE *instance = (DOKAN_INSTANCE *)DokanInstance;
   if (!instance) {
     return;
   }
   // make sure the driver is unmounted
-  instance->FileSystemStopped = TRUE;
-  DokanRemoveMountPoint(instance->MountPoint);
+  DokanRequestUnmount(DokanInstance);
   DokanWaitForFileSystemClosed((DOKAN_HANDLE)instance, INFINITE);
   EnterCriticalSection(&g_InstanceCriticalSection);
   DeleteDokanInstance(instance);

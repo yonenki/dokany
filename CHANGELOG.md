@@ -3,6 +3,14 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](http://keepachangelog.com/) and this project adheres to [Semantic Versioning](http://semver.org/).
 
+## [Unreleased]
+
+### Added
+- Library - Add `DokanRequestUnmount` to request a non-blocking unmount of an exact filesystem instance.
+
+### Fixed
+- Library - Make `DokanCloseHandle` unmount its exact filesystem instance instead of looking it up by mount point.
+
 ## [2.3.1.1000] - 2025-09-28
 
 ### Changed
