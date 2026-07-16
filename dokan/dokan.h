@@ -886,6 +886,11 @@ int DOKANAPI DokanCreateFileSystem(_In_ PDOKAN_OPTIONS DokanOptions,
  * The caller must keep \p CancellationEvent, \p DokanOptions,
  * \p DokanOperations, and callback-owned state valid until this function
  * returns. Passing \c NULL preserves the legacy non-cancellable behavior.
+ * Cancellation is cooperative. Dokany requests cancellation of pending lower
+ * driver operations and waits for their exact completion before returning. A
+ * lower driver that does not complete a cancelled request can therefore keep
+ * this call blocked; use process isolation when a hard termination bound is
+ * required for that failure class.
  *
  * \param DokanOptions a \ref DOKAN_OPTIONS that describes the mount.
  * \param DokanOperations callbacks for requests made by the kernel.
