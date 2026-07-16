@@ -1416,9 +1416,24 @@ int DokanStart(_In_ PDOKAN_INSTANCE DokanInstance,
     ULONG capabilitiesLength = 0;
     if (!SendToDevice(DOKAN_GLOBAL_DEVICE_NAME, FSCTL_GET_CAPABILITIES, NULL, 0,
                       &capabilities, sizeof(capabilities),
-                      &capabilitiesLength) ||
-        capabilitiesLength != sizeof(capabilities) ||
-        !(capabilities & DOKAN_DRIVER_CAPABILITY_START_CANCELLATION)) {
+                      &capabilitiesLength)) {
+      DWORD capabilityError = GetLastError();
+      if (capabilityError != ERROR_INVALID_FUNCTION &&
+          capabilityError != ERROR_NOT_SUPPORTED) {
+        DokanDbgPrint("Dokan Error: Driver capability query failed: %d.\n",
+                      capabilityError);
+        return DOKAN_START_ERROR;
+      }
+      DokanDbgPrint("Dokan Error: Driver does not expose mount startup "
+                    "capabilities.\n");
+      return DOKAN_DRIVER_FEATURE_ERROR;
+    }
+    if (capabilitiesLength != sizeof(capabilities)) {
+      DokanDbgPrint("Dokan Error: Driver capability query returned %d bytes.\n",
+                    capabilitiesLength);
+      return DOKAN_START_ERROR;
+    }
+    if (!(capabilities & DOKAN_DRIVER_CAPABILITY_START_CANCELLATION)) {
       DokanDbgPrint("Dokan Error: Driver does not support cancellable mount "
                     "startup.\n");
       return DOKAN_DRIVER_FEATURE_ERROR;
