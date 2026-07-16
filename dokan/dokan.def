@@ -38,3 +38,4 @@ DokanRegisterWaitForFileSystemClosed @20
 DokanUnregisterWaitForFileSystemClosed @29
 DokanCloseHandle @1
 DokanRequestUnmount @33
+DokanCreateFileSystemEx @34

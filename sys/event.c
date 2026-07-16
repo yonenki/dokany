@@ -774,9 +774,14 @@ VOID RemoveSessionDevices(__in PREQUEST_CONTEXT RequestContext,
 NTSTATUS
 DokanEventStart(__in PREQUEST_CONTEXT RequestContext) {
   ULONG outBufferLen;
+  ULONG inBufferLen;
+  PVOID inBuffer;
   PEVENT_START eventStart = NULL;
+  PEVENT_START providedEventStart = NULL;
   PEVENT_DRIVER_INFO driverInfo = NULL;
   PDokanDCB dcb = NULL;
+  PKEVENT cancellationEvent = NULL;
+  ULONG64 cancellationEventHandle = 0;
   NTSTATUS status;
   DEVICE_TYPE deviceType;
   ULONG deviceCharacteristics = 0;
@@ -797,15 +802,30 @@ DokanEventStart(__in PREQUEST_CONTEXT RequestContext) {
   DokanLogInfo(&logger, L"Entered event start.");
   DOKAN_LOG_FINE_IRP(RequestContext, "Event start");
 
-  // We just use eventStart variable for his type size calculation here
-  GET_IRP_BUFFER(RequestContext->Irp, eventStart);
-
+  inBufferLen = GetProvidedInputSize(RequestContext->Irp);
+  inBuffer = GetInputBuffer(RequestContext->Irp);
   outBufferLen =
       RequestContext->IrpSp->Parameters.DeviceIoControl.OutputBufferLength;
-  if (outBufferLen != sizeof(EVENT_DRIVER_INFO) || !eventStart) {
+  if (outBufferLen != sizeof(EVENT_DRIVER_INFO) || !inBuffer) {
     return DokanLogError(
         &logger, STATUS_INSUFFICIENT_RESOURCES,
         L"Buffer IN/OUT received do not match the expected size.");
+  }
+
+  if (inBufferLen == sizeof(EVENT_START)) {
+    providedEventStart = (PEVENT_START)inBuffer;
+  } else if (inBufferLen >= sizeof(EVENT_START_V2)) {
+    PEVENT_START_V2 eventStartV2 = (PEVENT_START_V2)inBuffer;
+    if (eventStartV2->Size < sizeof(EVENT_START_V2) ||
+        eventStartV2->Size > inBufferLen) {
+      return DokanLogError(&logger, STATUS_INVALID_PARAMETER,
+                           L"Invalid EVENT_START_V2 size.");
+    }
+    providedEventStart = &eventStartV2->EventStart;
+    cancellationEventHandle = eventStartV2->CancellationEvent;
+  } else {
+    return DokanLogError(&logger, STATUS_BUFFER_TOO_SMALL,
+                         L"Event start input buffer is too small.");
   }
 
   eventStart = DokanAlloc(sizeof(EVENT_START));
@@ -819,8 +839,7 @@ DokanEventStart(__in PREQUEST_CONTEXT RequestContext) {
                          L"Failed to allocate buffers in event start.");
   }
 
-  RtlCopyMemory(eventStart, RequestContext->Irp->AssociatedIrp.SystemBuffer,
-                sizeof(EVENT_START));
+  RtlCopyMemory(eventStart, providedEventStart, sizeof(EVENT_START));
   if (eventStart->UserVersion != DOKAN_DRIVER_VERSION) {
     DokanLogInfo(&logger, L"Driver version check in event start failed.");
     startFailure = TRUE;
@@ -972,6 +991,35 @@ DokanEventStart(__in PREQUEST_CONTEXT RequestContext) {
     volumeSecurityDescriptor = eventStart->VolumeSecurityDescriptor;
   }
 
+  if (cancellationEventHandle) {
+    status = ObReferenceObjectByHandle(
+        (HANDLE)(ULONG_PTR)cancellationEventHandle, SYNCHRONIZE,
+        *ExEventObjectType, RequestContext->Irp->RequestorMode,
+        (PVOID *)&cancellationEvent, NULL);
+    if (!NT_SUCCESS(status)) {
+      if (foundPrevEntry) {
+        ExReleaseResourceLite(&foundPrevEntry->Resource);
+      }
+      ExReleaseResourceLite(&RequestContext->DokanGlobal->Resource);
+      KeLeaveCriticalRegion();
+      ExFreePool(eventStart);
+      ExFreePool(baseGuidString);
+      return DokanLogError(&logger, status,
+                           L"Failed to reference the cancellation event.");
+    }
+    if (KeReadStateEvent(cancellationEvent)) {
+      if (foundPrevEntry) {
+        ExReleaseResourceLite(&foundPrevEntry->Resource);
+      }
+      ExReleaseResourceLite(&RequestContext->DokanGlobal->Resource);
+      KeLeaveCriticalRegion();
+      ExFreePool(eventStart);
+      ExFreePool(baseGuidString);
+      ObDereferenceObject(cancellationEvent);
+      return STATUS_CANCELLED;
+    }
+  }
+
   status = DokanCreateDiskDevice(
       RequestContext->DeviceObject->DriverObject,
       RequestContext->DokanGlobal->MountId, eventStart->MountPoint,
@@ -987,10 +1035,14 @@ DokanEventStart(__in PREQUEST_CONTEXT RequestContext) {
     KeLeaveCriticalRegion();
     ExFreePool(eventStart);
     ExFreePool(baseGuidString);
+    if (cancellationEvent) {
+      ObDereferenceObject(cancellationEvent);
+    }
     return DokanLogError(&logger, status, L"Disk device creation failed.");
   }
 
   dcb = dokanControl.Dcb;
+  dcb->MountCancellationEvent = cancellationEvent;
   dcb->MountOptions = eventStart->Flags;
   dcb->DispatchDriverLogs =
       (eventStart->Flags & DOKAN_EVENT_DISPATCH_DRIVER_LOGS) != 0;
@@ -1045,7 +1097,11 @@ DokanEventStart(__in PREQUEST_CONTEXT RequestContext) {
     KeLeaveCriticalRegion();
     ExFreePool(eventStart);
     ExFreePool(baseGuidString);
+    dcb->MountCancellationEvent = NULL;
     DokanDeleteDeviceObject(RequestContext, dcb);
+    if (cancellationEvent) {
+      ObDereferenceObject(cancellationEvent);
+    }
     return DokanLogError(&logger, STATUS_INSUFFICIENT_RESOURCES,
                          L"Failed to allocate new mount entry.");
   }
@@ -1116,14 +1172,26 @@ DokanEventStart(__in PREQUEST_CONTEXT RequestContext) {
                      /*ExclusiveLock=*/FALSE);
   if (!mountEntry) {
     // The device was removed right after being mounted and before we finish.
+    dcb->MountCancellationEvent = NULL;
     ExFreePool(eventStart);
     ExFreePool(baseGuidString);
+    if (cancellationEvent) {
+      ObDereferenceObject(cancellationEvent);
+    }
     return DokanLogError(&logger, STATUS_INSUFFICIENT_RESOURCES,
                          L"Unable to find mount entry after insert and "
                          L"IoVerifyVolume. The device must have been removed.");
   }
 
   if (useMountManager) {
+    if (!NT_SUCCESS(dcb->MountManagerStatus)) {
+      DokanLogError(&logger, dcb->MountManagerStatus,
+                    L"Mount Manager failed while starting the volume.");
+      driverInfo->Status = DOKAN_START_FAILED;
+      driverInfo->Flags |= DOKAN_DRIVER_INFO_NO_MOUNT_POINT_ASSIGNED |
+                           dcb->MountManagerFailureFlags;
+    }
+
     // The mount entry now has the actual mount point, because IoVerifyVolume
     // re-entrantly invokes DokanMountVolume, which calls DokanCreateMountPoint,
     // which re-entrantly issues IOCTL_MOUNTDEV_LINK_CREATED, and that updates
@@ -1178,7 +1246,17 @@ DokanEventStart(__in PREQUEST_CONTEXT RequestContext) {
         ExFreePool(setReparseInput);
         if (NT_SUCCESS(status)) {
           // Inform MountManager of the new mount point.
-          NotifyDirectoryMountPointCreated(dcb);
+          status = NotifyDirectoryMountPointCreated(dcb);
+          if (!NT_SUCCESS(status)) {
+            DokanLogError(
+                &logger, status,
+                L"Failed to notify Mount Manager of MountPoint \"%wZ\"",
+                dcb->MountPoint);
+            driverInfo->Status = DOKAN_START_FAILED;
+            driverInfo->Flags |=
+                DOKAN_DRIVER_INFO_NO_MOUNT_POINT_ASSIGNED |
+                DOKAN_DRIVER_INFO_MOUNT_POINT_NOTIFICATION_FAILED;
+          }
         } else {
           DokanLogError(&logger, status,
                         L"Failed to set reparse point on MountPoint \"%wZ\"",
@@ -1191,8 +1269,12 @@ DokanEventStart(__in PREQUEST_CONTEXT RequestContext) {
     }
   }
 
-  RequestContext->Irp->IoStatus.Status = STATUS_SUCCESS;
-  RequestContext->Irp->IoStatus.Information = sizeof(EVENT_DRIVER_INFO);
+  BOOLEAN startCancelled =
+      cancellationEvent && KeReadStateEvent(cancellationEvent);
+  RequestContext->Irp->IoStatus.Status =
+      startCancelled ? STATUS_CANCELLED : STATUS_SUCCESS;
+  RequestContext->Irp->IoStatus.Information =
+      startCancelled ? 0 : sizeof(EVENT_DRIVER_INFO);
 
   ExFreePool(eventStart);
   ExFreePool(baseGuidString);
@@ -1200,10 +1282,15 @@ DokanEventStart(__in PREQUEST_CONTEXT RequestContext) {
   PDEVICE_OBJECT volumeDeviceObject =
       mountEntry->MountControl.VolumeDeviceObject;
   ExReleaseResourceLite(&mountEntry->Resource);
-  if (driverInfo->Flags & DOKAN_DRIVER_INFO_NO_MOUNT_POINT_ASSIGNED) {
+  dcb->MountCancellationEvent = NULL;
+  if ((driverInfo->Flags & DOKAN_DRIVER_INFO_NO_MOUNT_POINT_ASSIGNED) ||
+      startCancelled) {
     DokanEventRelease(RequestContext, volumeDeviceObject);
     driverInfo->DeviceNumber = 0;
     driverInfo->MountId = 0;
+  }
+  if (cancellationEvent) {
+    ObDereferenceObject(cancellationEvent);
   }
 
   DokanLogInfo(&logger, L"Finished event start with status %d and flags: %I32x",
