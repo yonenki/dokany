@@ -88,7 +88,7 @@ jobs:
           [xml]$project = Get-Content (Join-Path $sourceDir 'sys.vcxproj')
           $namespace = New-Object System.Xml.XmlNamespaceManager($project.NameTable)
           $namespace.AddNamespace('msb', 'http://schemas.microsoft.com/developer/msbuild/2003')
-          $sources = $project.SelectNodes('//msb:ClCompile', $namespace) |
+          $sources = $project.SelectNodes('//msb:ItemGroup/msb:ClCompile[@Include]', $namespace) |
             ForEach-Object { Join-Path $sourceDir $_.Include }
           if (-not $sources) { throw 'No driver sources found' }
 
