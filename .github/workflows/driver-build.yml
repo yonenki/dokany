@@ -1,0 +1,29 @@
+name: Driver build validation
+
+on:
+  push:
+    branches:
+      - ci/issue-1-driver-build-3287d9d
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  driver:
+    runs-on: windows-2022
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: [x64, Win32, ARM64]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: microsoft/setup-msbuild@v2
+      - name: Inspect WDK
+        shell: pwsh
+        run: |
+          Get-ChildItem 'C:\Program Files (x86)\Windows Kits\10\Include' | Select-Object -ExpandProperty Name
+          Get-ChildItem 'C:\Program Files (x86)\Microsoft Visual Studio\2022\Enterprise\MSBuild\Microsoft\VC' -Recurse -Filter WindowsKernelModeDriver10.0.props | Select-Object -First 5 -ExpandProperty FullName
+      - name: Build driver
+        shell: pwsh
+        run: msbuild sys\sys.vcxproj /m /t:Rebuild /p:Configuration=Release /p:Platform=${{ matrix.platform }}
