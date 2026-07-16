@@ -131,7 +131,10 @@ NTSTATUS DokanSendVolumeMountPoint(__in PDokanDCB Dcb, BOOLEAN Create) {
   status = DokanSendIoContlToMountManager(
       Create ? IOCTL_MOUNTMGR_VOLUME_MOUNT_POINT_CREATED
              : IOCTL_MOUNTMGR_VOLUME_MOUNT_POINT_DELETED,
-      volumMountPoint, length, NULL, 0, Dcb->MountCancellationEvent);
+      volumMountPoint, length, NULL, 0,
+      // Startup cancellation must never interrupt teardown, nor may teardown
+      // borrow the startup event while its owner is about to release it.
+      Create ? Dcb->MountCancellationEvent : NULL);
 
   ExFreePool(volumMountPoint);
   return status;

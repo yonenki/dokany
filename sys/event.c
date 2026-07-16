@@ -796,6 +796,7 @@ DokanEventStart(__in PREQUEST_CONTEXT RequestContext) {
   PSECURITY_DESCRIPTOR volumeSecurityDescriptor = NULL;
   BOOLEAN startFailure = FALSE;
   BOOLEAN isMountPointDriveLetter = FALSE;
+  PDEVICE_OBJECT startupDiskDeviceObject = NULL;
 
   DOKAN_INIT_LOGGER(logger, RequestContext->DeviceObject->DriverObject, 0);
 
@@ -1162,6 +1163,12 @@ DokanEventStart(__in PREQUEST_CONTEXT RequestContext) {
 
   DokanStartEventNotificationThread(dcb);
 
+  // Pin the DCB's device object until the borrowed cancellation-event pointer
+  // has been unpublished. The mount entry can be removed concurrently while
+  // IoVerifyVolume runs.
+  startupDiskDeviceObject = dcb->DeviceObject;
+  ObReferenceObject(startupDiskDeviceObject);
+
   ExReleaseResourceLite(&RequestContext->DokanGlobal->Resource);
   KeLeaveCriticalRegion();
 
@@ -1178,6 +1185,7 @@ DokanEventStart(__in PREQUEST_CONTEXT RequestContext) {
     if (cancellationEvent) {
       ObDereferenceObject(cancellationEvent);
     }
+    ObDereferenceObject(startupDiskDeviceObject);
     return DokanLogError(&logger, STATUS_INSUFFICIENT_RESOURCES,
                          L"Unable to find mount entry after insert and "
                          L"IoVerifyVolume. The device must have been removed.");
@@ -1281,8 +1289,11 @@ DokanEventStart(__in PREQUEST_CONTEXT RequestContext) {
 
   PDEVICE_OBJECT volumeDeviceObject =
       mountEntry->MountControl.VolumeDeviceObject;
-  ExReleaseResourceLite(&mountEntry->Resource);
+  // Stop publishing the borrowed event while the mount entry still pins this
+  // DCB. Once the entry lock is released, another thread may complete device
+  // deletion and make the DCB unavailable.
   dcb->MountCancellationEvent = NULL;
+  ExReleaseResourceLite(&mountEntry->Resource);
   if ((driverInfo->Flags & DOKAN_DRIVER_INFO_NO_MOUNT_POINT_ASSIGNED) ||
       startCancelled) {
     DokanEventRelease(RequestContext, volumeDeviceObject);
@@ -1292,6 +1303,7 @@ DokanEventStart(__in PREQUEST_CONTEXT RequestContext) {
   if (cancellationEvent) {
     ObDereferenceObject(cancellationEvent);
   }
+  ObDereferenceObject(startupDiskDeviceObject);
 
   DokanLogInfo(&logger, L"Finished event start with status %d and flags: %I32x",
                driverInfo->Status, driverInfo->Flags);
