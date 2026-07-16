@@ -915,6 +915,22 @@ BOOL DOKANAPI DokanUnregisterWaitForFileSystemClosed(_In_ HANDLE WaitHandle,
                                                      BOOL WaitForCallbacks);
 
 /**
+ * \brief Request an unmount of a Dokan instance without waiting for it to close.
+ *
+ * Unlike \ref DokanRemoveMountPoint, this function targets the exact instance
+ * represented by \p DokanInstance instead of looking it up by mount point. The
+ * request is idempotent. Use \ref DokanWaitForFileSystemClosed to wait for the
+ * unmount to complete and \ref DokanCloseHandle to release the instance after
+ * it has closed.
+ *
+ * \param DokanInstance The Dokan mount context created by
+ * \ref DokanCreateFileSystem.
+ * \return \c TRUE if the instance was already closed or the unmount request
+ * was sent successfully; otherwise \c FALSE.
+ */
+BOOL DOKANAPI DokanRequestUnmount(_In_ DOKAN_HANDLE DokanInstance);
+
+/**
  * \brief Unmount the Dokan instance.
  * 
  * Unmount and wait until all resources of the \c DokanInstance are released.
