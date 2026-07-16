@@ -79,6 +79,23 @@ with this program. If not, see <http://www.gnu.org/licenses/>.
 #define FSCTL_EVENT_PROCESS_N_PULL                                                     \
   CTL_CODE(FILE_DEVICE_FILE_SYSTEM, 0x812, METHOD_BUFFERED, FILE_ANY_ACCESS)
 
+// Query whether at least one user-mode event dispatcher has reached the
+// volume's event pull path. The output is a ULONG boolean value.
+#define FSCTL_EVENT_QUERY_DISPATCH_READY                                      \
+  CTL_CODE(FILE_DEVICE_FILE_SYSTEM, 0x813, METHOD_BUFFERED, FILE_ANY_ACCESS)
+
+// Retrieve additive driver protocol capabilities as a ULONGLONG bit mask.
+#define FSCTL_GET_CAPABILITIES                                                 \
+  CTL_CODE(FILE_DEVICE_FILE_SYSTEM, 0x814, METHOD_BUFFERED, FILE_ANY_ACCESS)
+
+#define DOKAN_DRIVER_CAPABILITY_DISPATCH_READY (1ULL << 0)
+#define DOKAN_DRIVER_CAPABILITY_START_CANCELLATION (1ULL << 1)
+#define DOKAN_DRIVER_CAPABILITY_MOUNT_MANAGER_STATUS (1ULL << 2)
+#define DOKAN_DRIVER_CAPABILITIES                                              \
+  (DOKAN_DRIVER_CAPABILITY_DISPATCH_READY |                                    \
+   DOKAN_DRIVER_CAPABILITY_START_CANCELLATION |                                \
+   DOKAN_DRIVER_CAPABILITY_MOUNT_MANAGER_STATUS)
+
 #define DRIVER_FUNC_INSTALL 0x01
 #define DRIVER_FUNC_REMOVE 0x02
 
@@ -452,6 +469,13 @@ typedef struct _EVENT_INFORMATION {
 // Dokan failed to set the reparse point for the mount point folder provided.
 #define DOKAN_DRIVER_INFO_SET_REPARSE_POINT_FAILED 32
 
+// The volume arrival notification sent to Mount Manager failed.
+#define DOKAN_DRIVER_INFO_VOLUME_ARRIVAL_FAILED 64
+
+// Mount Manager failed to record a directory mount point after its reparse
+// point was created.
+#define DOKAN_DRIVER_INFO_MOUNT_POINT_NOTIFICATION_FAILED 128
+
 typedef struct _EVENT_DRIVER_INFO {
   ULONG DriverVersion;
   ULONG Status;
@@ -473,6 +497,19 @@ typedef struct _EVENT_START {
   ULONG VolumeSecurityDescriptorLength;
   CHAR VolumeSecurityDescriptor[VOLUME_SECURITY_DESCRIPTOR_MAX_SIZE];
 } EVENT_START, *PEVENT_START;
+
+// Additive start protocol used by DokanCreateFileSystemEx. EVENT_START remains
+// unchanged so legacy DLL/driver pairs keep their existing wire layout.
+typedef struct _EVENT_START_V2 {
+  ULONG Size;
+  ULONG Reserved;
+  EVENT_START EventStart;
+  ULONG64 CancellationEvent;
+} EVENT_START_V2, *PEVENT_START_V2;
+
+C_ASSERT(FIELD_OFFSET(EVENT_START_V2, EventStart) == sizeof(ULONG) * 2);
+C_ASSERT(FIELD_OFFSET(EVENT_START_V2, CancellationEvent) ==
+         sizeof(ULONG) * 2 + sizeof(EVENT_START));
 
 #ifdef _MSC_VER
 #pragma warning(push)

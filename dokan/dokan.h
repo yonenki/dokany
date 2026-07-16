@@ -813,6 +813,10 @@ typedef struct _DOKAN_OPERATIONS {
  * Requested an incompatible version.
  */
 #define DOKAN_VERSION_ERROR -7
+/** Dokan mount was cancelled through DokanCreateFileSystemEx. */
+#define DOKAN_CANCELLED_ERROR -8
+/** The installed driver does not support a feature required by the API. */
+#define DOKAN_DRIVER_FEATURE_ERROR -9
 
 /** @} */
 
@@ -870,6 +874,32 @@ int DOKANAPI DokanMain(PDOKAN_OPTIONS DokanOptions,
 int DOKANAPI DokanCreateFileSystem(_In_ PDOKAN_OPTIONS DokanOptions,
                                    _In_ PDOKAN_OPERATIONS DokanOperations,
                                    _Out_ DOKAN_HANDLE *DokanInstance);
+
+/**
+ * \brief Mount a new Dokan Volume with cooperative startup cancellation.
+ *
+ * This is an additive variant of \ref DokanCreateFileSystem. The cancellation
+ * event may be signalled from another thread while startup is in progress. A
+ * \ref DOKAN_CANCELLED_ERROR result means startup cleanup has completed and no
+ * filesystem instance will become mounted later from that request.
+ *
+ * The caller must keep \p CancellationEvent, \p DokanOptions,
+ * \p DokanOperations, and callback-owned state valid until this function
+ * returns. Passing \c NULL preserves the legacy non-cancellable behavior.
+ *
+ * \param DokanOptions a \ref DOKAN_OPTIONS that describes the mount.
+ * \param DokanOperations callbacks for requests made by the kernel.
+ * \param CancellationEvent optional manual-reset event whose signalled state
+ * requests cancellation.
+ * \param DokanInstance receives the mount instance only on success.
+ * \return \ref DokanMainResult status, including
+ * \ref DOKAN_CANCELLED_ERROR and \ref DOKAN_DRIVER_FEATURE_ERROR.
+ */
+int DOKANAPI DokanCreateFileSystemEx(
+    _In_ PDOKAN_OPTIONS DokanOptions,
+    _In_ PDOKAN_OPERATIONS DokanOperations,
+    _In_opt_ HANDLE CancellationEvent,
+    _Out_ DOKAN_HANDLE *DokanInstance);
 
 /**
  * \brief Check if the FileSystem is still running or not.

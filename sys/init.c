@@ -826,7 +826,8 @@ VOID DokanCreateMountPoint(__in PDokanDCB Dcb) {
   if (Dcb->MountPoint != NULL && Dcb->MountPoint->Length > 0) {
     if (Dcb->UseMountManager) {
       DokanSendVolumeCreatePoint(Dcb->DriverObject, Dcb->DiskDeviceName,
-                                 Dcb->MountPoint);
+                                 Dcb->MountPoint,
+                                 Dcb->MountCancellationEvent);
     } else {
       DokanLogInfo(&logger, L"Not using Mount Manager.");
       if (Dcb->MountGlobally) {
@@ -891,7 +892,7 @@ VOID DokanDeleteMountPoint(__in_opt PREQUEST_CONTEXT RequestContext,
           ExFreePool(removeReparseInput);
         }
         // Inform MountManager we are removing the reparse point.
-        NotifyDirectoryMountPointDeleted(Dcb);
+        (void)NotifyDirectoryMountPointDeleted(Dcb);
         // Remove the device from MountManager DB that should no longer have a
         // mount point attached.
         DokanSendVolumeDeletePoints(NULL, Dcb->DiskDeviceName);

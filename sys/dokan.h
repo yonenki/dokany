@@ -284,12 +284,22 @@ typedef struct _DokanDiskControlBlock {
   // point yet.
   BOOLEAN MountPointDetermined;
 
+  // First Mount Manager failure observed while the volume is starting and the
+  // corresponding DOKAN_DRIVER_INFO_* flags returned to user mode.
+  NTSTATUS MountManagerStatus;
+  ULONG MountManagerFailureFlags;
+  PKEVENT MountCancellationEvent;
+
   // Whether to dispatch the driver logs to userland.
   BOOLEAN DispatchDriverLogs;
   // Allow I/O requests to be conveyed to user mode in batches, rather than
   // strictly one for each DeviceIoControl that the DLL issues to fetch a
   // request.
   BOOLEAN AllowIpcBatching;
+
+  // Sticky state set when the first user-mode dispatcher reaches the event
+  // pull path. Access this through interlocked operations.
+  volatile LONG DispatchReady;
 
   // How often to garbage-collect FCBs. If this is 0, we use the historical
   // default behavior of freeing them on the spot and in the current context
