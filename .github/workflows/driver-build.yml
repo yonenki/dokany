@@ -48,19 +48,35 @@ jobs:
       - uses: microsoft/setup-msbuild@v2
         with:
           msbuild-architecture: x64
-      - name: Install WDK 22621.5193 for supported x86 validation
+      - name: Install SDK and WDK 19041.5738 for x86 validation
         shell: pwsh
         run: |
-          $installer = Join-Path $env:RUNNER_TEMP 'wdksetup.exe'
-          Invoke-WebRequest 'https://download.microsoft.com/download/03f059f8-d6a3-4b9c-b85b-95cc401be222/wdk/wdksetup.exe' -OutFile $installer
-          $hash = (Get-FileHash -Algorithm SHA256 $installer).Hash
-          if ($hash -ne '23C557139FB1DD9E4EC93C5960A5FDA3C9F97ED42860BE0E20D765417CA1A96D') { throw "WDK installer hash mismatch: $hash" }
-          $process = Start-Process -FilePath $installer -ArgumentList '/q' -Wait -PassThru
-          if ($process.ExitCode -notin 0, 3010) { throw "WDK installer failed: $($process.ExitCode)" }
+          $installers = @(
+            @{
+              Name = 'SDK'
+              File = 'winsdksetup.exe'
+              Uri = 'https://download.microsoft.com/download/e119c04b-71aa-4067-ac3c-360c2e13d209/windowssdk/winsdksetup.exe'
+              Hash = 'F7D4526419DF5BFA00ACEE91677B28CB29D60660F5C6A0A747E004EEA0533DE2'
+            },
+            @{
+              Name = 'WDK'
+              File = 'wdksetup.exe'
+              Uri = 'https://download.microsoft.com/download/1b122713-4a55-4a95-8848-279de832a4c9/wdk/wdksetup.exe'
+              Hash = '596D51830EDA95C17486BCE114ECCE3D6DAFE7FECFBDE037828A6FCBC9D4865A'
+            }
+          )
+          foreach ($item in $installers) {
+            $installer = Join-Path $env:RUNNER_TEMP $item.File
+            Invoke-WebRequest $item.Uri -OutFile $installer
+            $hash = (Get-FileHash -Algorithm SHA256 $installer).Hash
+            if ($hash -ne $item.Hash) { throw "$($item.Name) installer hash mismatch: $hash" }
+            $process = Start-Process -FilePath $installer -ArgumentList '/q' -Wait -PassThru
+            if ($process.ExitCode -notin 0, 3010) { throw "$($item.Name) installer failed: $($process.ExitCode)" }
+          }
       - name: Build x86 driver
         shell: pwsh
         run: |
-          msbuild sys\sys.vcxproj /m /t:Rebuild /p:Configuration=Release /p:Platform=Win32 /p:WindowsTargetPlatformVersion=10.0.22621.0 /p:TargetVersion=Windows10 /p:_NT_TARGET_VERSION=0xA000008 /p:KmdfVersion=1.15 /p:SignMode=Off
+          msbuild sys\sys.vcxproj /m /t:Rebuild /p:Configuration=Release /p:Platform=Win32 /p:WindowsTargetPlatformVersion=10.0.19041.0 /p:TargetVersion=Windows10 /p:_NT_TARGET_VERSION=0xA000008 /p:KmdfVersion=1.15 /p:SignMode=Off
           if ($LASTEXITCODE -ne 0) { throw 'Driver build failed for Win32' }
       - uses: actions/upload-artifact@v4
         with:
