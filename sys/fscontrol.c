@@ -939,21 +939,23 @@ NTSTATUS DokanMountVolume(__in PREQUEST_CONTEXT RequestContext) {
   BOOLEAN isDriveLetter = IsMountPointDriveLetter(dcb->MountPoint);
   // Create mount point for the volume
   if (dcb->UseMountManager) {
-    BOOLEAN autoMountStateBackup = TRUE;
+    BOOLEAN autoMountStateBackup = FALSE;
+    BOOLEAN autoMountDisabled = FALSE;
     if (!isDriveLetter) {
       ExAcquireResourceExclusiveLite(&dcb->Global->MountManagerLock, TRUE);
       // Query current AutoMount State to restore it afterward.
-      DokanQueryAutoMount(&autoMountStateBackup,
-                          dcb->MountCancellationEvent);
-      // In case of failure, we suppose it was Enabled.
+      NTSTATUS autoMountStatus = DokanQueryAutoMount(
+          &autoMountStateBackup, dcb->MountCancellationEvent);
 
       // MountManager suggest workflow do not accept a path longer than
       // a driver letter mount point so we cannot use it to suggest
       // our directory mount point. We disable Mount Manager AutoMount
       // for avoiding having a driver letter assign to our device
       // for the time we create our own mount point.
-      if (autoMountStateBackup) {
-        DokanSendAutoMount(FALSE, dcb->MountCancellationEvent);
+      if (NT_SUCCESS(autoMountStatus) && autoMountStateBackup) {
+        autoMountStatus =
+            DokanSendAutoMount(FALSE, dcb->MountCancellationEvent);
+        autoMountDisabled = NT_SUCCESS(autoMountStatus);
       }
     }
     status = DokanSendVolumeArrivalNotification(
@@ -969,7 +971,7 @@ NTSTATUS DokanMountVolume(__in PREQUEST_CONTEXT RequestContext) {
     }
     if (!isDriveLetter) {
       // Restore previous AutoMount state.
-      if (autoMountStateBackup) {
+      if (autoMountDisabled) {
         // Restoration must not be skipped merely because startup was
         // cancelled after AutoMount was disabled.
         DokanSendAutoMount(TRUE, NULL);
