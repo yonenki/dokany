@@ -12,23 +12,29 @@ permissions:
 jobs:
   driver:
     runs-on: windows-2022
-    strategy:
-      fail-fast: false
-      matrix:
-        platform: [x64, Win32, ARM64]
     steps:
       - uses: actions/checkout@v4
       - uses: microsoft/setup-msbuild@v2
-      - name: Install WDK 26100
+      - name: Install WDK 26100.6584
         shell: pwsh
-        run: winget install --source winget --exact --id Microsoft.WindowsWDK.10.0.26100 --accept-source-agreements --accept-package-agreements --silent --disable-interactivity
+        run: |
+          $installer = Join-Path $env:RUNNER_TEMP 'wdksetup.exe'
+          Invoke-WebRequest 'https://download.microsoft.com/download/41fb59c2-1723-45f9-a270-96b73ad58233/KIT_BUNDLE_WDK_MEDIACREATION/wdksetup.exe' -OutFile $installer
+          $hash = (Get-FileHash -Algorithm SHA256 $installer).Hash
+          if ($hash -ne 'ED82C46BD98E0F1D07FD6E5075900E42AEDC3FA5E68C06A8764B3DC5303CFF1B') { throw "WDK installer hash mismatch: $hash" }
+          $process = Start-Process -FilePath $installer -ArgumentList '/q' -Wait -PassThru
+          if ($process.ExitCode -notin 0, 3010) { throw "WDK installer failed: $($process.ExitCode)" }
       - name: Build driver
         shell: pwsh
-        run: msbuild sys\sys.vcxproj /m /t:Rebuild /p:Configuration=Release /p:Platform=${{ matrix.platform }} /p:WindowsTargetPlatformVersion=10.0.26100.0
+        run: |
+          foreach ($platform in 'x64', 'Win32', 'ARM64') {
+            msbuild sys\sys.vcxproj /m /t:Rebuild /p:Configuration=Release /p:Platform=$platform /p:WindowsTargetPlatformVersion=10.0.26100.0
+            if ($LASTEXITCODE -ne 0) { throw "Driver build failed for $platform" }
+          }
       - uses: actions/upload-artifact@v4
         with:
-          name: driver-${{ matrix.platform }}
+          name: drivers
           path: |
             sys/**/Release/*.sys
             sys/**/Release/*.pdb
-          if-no-files-found: warn
+          if-no-files-found: error
