@@ -28,7 +28,7 @@ jobs:
         shell: pwsh
         run: |
           foreach ($platform in 'x64', 'Win32', 'ARM64') {
-            msbuild sys\sys.vcxproj /m /t:Rebuild /p:Configuration=Release /p:Platform=$platform /p:WindowsTargetPlatformVersion=10.0.26100.0
+            msbuild sys\sys.vcxproj /m /t:Rebuild /p:Configuration=Release /p:Platform=$platform /p:WindowsTargetPlatformVersion=10.0.26100.0 /p:KmdfVersion=1.11
             if ($LASTEXITCODE -ne 0) { throw "Driver build failed for $platform" }
           }
       - uses: actions/upload-artifact@v4
