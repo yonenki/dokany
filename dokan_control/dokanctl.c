@@ -160,8 +160,6 @@ int __cdecl wmain(int argc, PWCHAR argv[]) {
 
   ExpandEnvironmentStringsW(DOKAN_DRIVER_FULL_PATH, driverFullPath, MAX_PATH);
 
-  fwprintf(stdout, L"Driver path: '%ls'\n", driverFullPath);
-
   WCHAR option = GetOption(argc, argv, 1);
   if (option == L'\0' || option == L'?') {
     return ShowUsage();
@@ -173,9 +171,16 @@ int __cdecl wmain(int argc, PWCHAR argv[]) {
     return EXIT_FAILURE;
   }
 
+  if (option == L'i') {
+    fwprintf(stdout, L"Driver path: '%ls'\n", driverFullPath);
+  }
+
   switch (option) {
   // Admin rights required
   case L'i': {
+    if (argc < 3) {
+      return DefaultCaseOption();
+    }
     WCHAR type = towlower(argv[2][0]);
     int result = EXIT_SUCCESS;
     if (type != L'd' && type != L'n' && type != L'a') {
@@ -197,6 +202,9 @@ int __cdecl wmain(int argc, PWCHAR argv[]) {
   }
 
   case L'r': {
+    if (argc < 3) {
+      return DefaultCaseOption();
+    }
     WCHAR type = towlower(argv[2][0]);
     int result = EXIT_SUCCESS;
     if (type != L'd' && type != L'n' && type != L'a') {
@@ -218,6 +226,9 @@ int __cdecl wmain(int argc, PWCHAR argv[]) {
   }
 
   case L'd': {
+    if (argc < 3) {
+      return DefaultCaseOption();
+    }
     WCHAR type = towlower(argv[2][0]);
     if (L'0' > type || type > L'7')
       return DefaultCaseOption();
