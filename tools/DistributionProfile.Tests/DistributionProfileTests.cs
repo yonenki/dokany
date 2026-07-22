@@ -1,3 +1,4 @@
+using System.Security.Cryptography;
 using System.Text.Json;
 using Dokany.DistributionProfile;
 using Xunit;
@@ -92,6 +93,72 @@ public sealed class DistributionProfileTests
     }
 
     [Fact]
+    public void ReleasePackageIsImmutableAndHashesTheSelectedFamilyArtifacts()
+    {
+        var profile = DistributionProfileLoader.Load(
+            Path.Combine(RepositoryRoot, "profiles", "textil.json"));
+        var generated = DistributionProfileGenerator.Render(profile);
+        using var temporary = new TemporaryDirectory();
+        File.WriteAllText(Path.Combine(temporary.Path, "license.lgpl.txt"), "lgpl");
+        File.WriteAllText(Path.Combine(temporary.Path, "license.mit.txt"), "mit");
+        var artifacts = Path.Combine(temporary.Path, "artifacts");
+        Directory.CreateDirectory(artifacts);
+        var dll = Write(artifacts, "textildokan2.dll", "dll");
+        var library = Write(artifacts, "textildokan2.lib", "lib");
+        var driver = Write(artifacts, "textildokan2.sys", "sys");
+        var inf = Write(artifacts, "textildokan2.inf", generated.Inf);
+        var catalog = Write(artifacts, "textildokan2.cat", "cat");
+        var control = Write(artifacts, "textildokanctl.exe", "control");
+        var output = Path.Combine(temporary.Path, "package");
+
+        var manifest = DistributionPackageBuilder.Create(
+            profile,
+            generated,
+            new DistributionPackageInputs(
+                "x64", new string('a', 40), output, dll, library, driver, inf, catalog, control,
+                temporary.Path));
+
+        Assert.Equal(profile.ProfileHash, manifest.ProfileHash);
+        Assert.Equal("runtimeDll", manifest.Files["runtime/textildokan2.dll"].Role);
+        Assert.Equal(
+            Convert.ToHexString(SHA256.HashData(System.Text.Encoding.UTF8.GetBytes("dll"))).ToLowerInvariant(),
+            manifest.Files["runtime/textildokan2.dll"].Sha256);
+        Assert.True(File.Exists(Path.Combine(output, "artifact-manifest.json")));
+        Assert.Throws<DistributionProfileValidationException>(() => DistributionPackageBuilder.Create(
+            profile,
+            generated,
+            new DistributionPackageInputs(
+                "x64", new string('a', 40), output, dll, library, driver, inf, catalog, control,
+                temporary.Path)));
+    }
+
+    [Fact]
+    public void ReleasePackageRejectsAnInfMutatedAfterProfileGeneration()
+    {
+        var profile = DistributionProfileLoader.Load(
+            Path.Combine(RepositoryRoot, "profiles", "textil.json"));
+        var generated = DistributionProfileGenerator.Render(profile);
+        using var temporary = new TemporaryDirectory();
+        File.WriteAllText(Path.Combine(temporary.Path, "license.lgpl.txt"), "lgpl");
+        File.WriteAllText(Path.Combine(temporary.Path, "license.mit.txt"), "mit");
+        var dll = Write(temporary.Path, "textildokan2.dll", "dll");
+        var library = Write(temporary.Path, "textildokan2.lib", "lib");
+        var driver = Write(temporary.Path, "textildokan2.sys", "sys");
+        var inf = Write(temporary.Path, "textildokan2.inf", generated.Inf + "; mutation");
+        var catalog = Write(temporary.Path, "textildokan2.cat", "cat");
+        var control = Write(temporary.Path, "textildokanctl.exe", "control");
+
+        var error = Assert.Throws<DistributionProfileValidationException>(() => DistributionPackageBuilder.Create(
+            profile,
+            generated,
+            new DistributionPackageInputs(
+                "x64", new string('b', 40), Path.Combine(temporary.Path, "package"), dll, library,
+                driver, inf, catalog, control, temporary.Path)));
+
+        Assert.Contains("INF differs", error.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void VendorProfileCannotReuseOfficialOperationalIdentity()
     {
         var path = WriteProfileMutation(profile =>
@@ -135,5 +202,28 @@ public sealed class DistributionProfileTests
         var path = Path.Combine(Path.GetTempPath(), $"dokany-profile-{Guid.NewGuid():N}.json");
         File.WriteAllText(path, profile.ToJsonString(new JsonSerializerOptions { WriteIndented = true }));
         return path;
+    }
+
+    private static string Write(string directory, string name, string content)
+    {
+        var path = Path.Combine(directory, name);
+        File.WriteAllText(path, content);
+        return path;
+    }
+
+    private sealed class TemporaryDirectory : IDisposable
+    {
+        public TemporaryDirectory()
+        {
+            Path = System.IO.Path.Combine(System.IO.Path.GetTempPath(), $"dokany-package-{Guid.NewGuid():N}");
+            Directory.CreateDirectory(Path);
+        }
+
+        public string Path { get; }
+
+        public void Dispose()
+        {
+            Directory.Delete(Path, recursive: true);
+        }
     }
 }
