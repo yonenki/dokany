@@ -351,6 +351,18 @@ NTSTATUS DokanEventRelease(__in_opt PREQUEST_CONTEXT RequestContext,
     return STATUS_SUCCESS;
   }
 
+  // Atomically claim the release. The checks above and the unmount-pending
+  // flag sets below are not atomic, so concurrent releasers (user-mode
+  // unmount request, timeout thread, mount manager) could both pass the
+  // checks and run the whole teardown twice, leading to double frees.
+  if (InterlockedOr((PLONG)&dcb->Flags, DCB_DELETE_PENDING) &
+      DCB_DELETE_PENDING) {
+    DokanLogInfo(&logger,
+                 L"Event release is already running for this device.");
+    return STATUS_SUCCESS;
+  }
+  SetLongFlag(vcb->Flags, VCB_DISMOUNT_PENDING);
+
   status = IoAcquireRemoveLock(&dcb->RemoveLock, RequestContext);
   if (!NT_SUCCESS(status)) {
     DokanLogError(&logger, status, L"IoAcquireRemoveLock failed in release.");
@@ -361,10 +373,6 @@ NTSTATUS DokanEventRelease(__in_opt PREQUEST_CONTEXT RequestContext,
   // in case of MountManager some request because of delete
   // must be handled properly
   DokanDeleteMountPoint(RequestContext, dcb);
-
-  // then mark the device for unmount pending
-  SetLongFlag(vcb->Flags, VCB_DISMOUNT_PENDING);
-  SetLongFlag(dcb->Flags, DCB_DELETE_PENDING);
 
   DokanLogInfo(&logger, L"Starting unmount for device \"%wZ\"",
                         dcb->DiskDeviceName);
@@ -383,6 +391,7 @@ NTSTATUS DokanEventRelease(__in_opt PREQUEST_CONTEXT RequestContext,
   ClearLongFlag(vcb->Flags, VCB_MOUNTED);
 
   if (vcb->FCBAvlNodeLookasideListInit) {
+    vcb->FCBAvlNodeLookasideListInit = FALSE;
     ExDeleteLookasideListEx(&vcb->FCBAvlNodeLookasideList);
   }
   DokanCleanupAllChangeNotificationWaiters(vcb);
