@@ -43,6 +43,12 @@ typedef struct _DOKAN_INSTANCE_THREADINFO {
   TP_CALLBACK_ENVIRON CallbackEnvironment;
 } DOKAN_INSTANCE_THREADINFO;
 
+_Success_(return != FALSE)
+BOOL DokanQueryRuntimeIdentity(_In_ HANDLE Device,
+                               _Out_ PDOKAN_RUNTIME_IDENTITY Identity);
+BOOL DokanIsRuntimeIdentityCompatible(
+    _In_ const DOKAN_RUNTIME_IDENTITY *Identity);
+
 /**
  * \struct DOKAN_INSTANCE
  * \brief Dokan mount instance informations

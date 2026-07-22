@@ -149,7 +149,7 @@
   <PropertyGroup />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <DebuggerFlavor>DbgengKernelDebugger</DebuggerFlavor>
-    <TargetName>dokan$(DOKANAPIVersion)</TargetName>
+    <TargetName>$(DokanBinaryBaseName)</TargetName>
     <OutDir>$(SolutionDir)$(Platform)\$(ConfigurationName)\Driver\</OutDir>
     <IntDir>$(Platform)\$(ConfigurationName)\</IntDir>
     <CodeAnalysisRuleSet>C:\Program Files (x86)\Windows Kits\10\CodeAnalysis\DriverRecommendedRules.ruleset</CodeAnalysisRuleSet>
@@ -159,19 +159,19 @@
     <CodeAnalysisRuleSet>C:\Program Files (x86)\Windows Kits\10\CodeAnalysis\DriverRecommendedRules.ruleset</CodeAnalysisRuleSet>
     <RunCodeAnalysis>true</RunCodeAnalysis>
     <DebuggerFlavor>DbgengKernelDebugger</DebuggerFlavor>
-    <TargetName>dokan$(DOKANAPIVersion)</TargetName>
+    <TargetName>$(DokanBinaryBaseName)</TargetName>
     <OutDir>$(SolutionDir)$(Platform)\$(ConfigurationName)\Driver\</OutDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|ARM64'">
     <CodeAnalysisRuleSet>C:\Program Files (x86)\Windows Kits\10\CodeAnalysis\DriverRecommendedRules.ruleset</CodeAnalysisRuleSet>
     <RunCodeAnalysis>true</RunCodeAnalysis>
     <DebuggerFlavor>DbgengKernelDebugger</DebuggerFlavor>
-    <TargetName>dokan$(DOKANAPIVersion)</TargetName>
+    <TargetName>$(DokanBinaryBaseName)</TargetName>
     <OutDir>$(SolutionDir)$(Platform)\$(ConfigurationName)\Driver\</OutDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <DebuggerFlavor>DbgengKernelDebugger</DebuggerFlavor>
-    <TargetName>dokan$(DOKANAPIVersion)</TargetName>
+    <TargetName>$(DokanBinaryBaseName)</TargetName>
     <OutDir>$(SolutionDir)$(Platform)\$(ConfigurationName)\Driver\</OutDir>
     <IntDir>$(Platform)\$(ConfigurationName)\</IntDir>
     <CodeAnalysisRuleSet>C:\Program Files (x86)\Windows Kits\10\CodeAnalysis\DriverRecommendedRules.ruleset</CodeAnalysisRuleSet>
@@ -181,26 +181,26 @@
     <CodeAnalysisRuleSet>C:\Program Files (x86)\Windows Kits\10\CodeAnalysis\DriverRecommendedRules.ruleset</CodeAnalysisRuleSet>
     <RunCodeAnalysis>false</RunCodeAnalysis>
     <DebuggerFlavor>DbgengKernelDebugger</DebuggerFlavor>
-    <TargetName>dokan$(DOKANAPIVersion)</TargetName>
+    <TargetName>$(DokanBinaryBaseName)</TargetName>
     <OutDir>$(SolutionDir)$(Platform)\$(ConfigurationName)\Driver\</OutDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|ARM64'">
     <CodeAnalysisRuleSet>C:\Program Files (x86)\Windows Kits\10\CodeAnalysis\DriverRecommendedRules.ruleset</CodeAnalysisRuleSet>
     <RunCodeAnalysis>false</RunCodeAnalysis>
     <DebuggerFlavor>DbgengKernelDebugger</DebuggerFlavor>
-    <TargetName>dokan$(DOKANAPIVersion)</TargetName>
+    <TargetName>$(DokanBinaryBaseName)</TargetName>
     <OutDir>$(SolutionDir)$(Platform)\$(ConfigurationName)\Driver\</OutDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <DebuggerFlavor>DbgengKernelDebugger</DebuggerFlavor>
-    <TargetName>dokan$(DOKANAPIVersion)</TargetName>
+    <TargetName>$(DokanBinaryBaseName)</TargetName>
     <CodeAnalysisRuleSet>C:\Program Files (x86)\Windows Kits\10\CodeAnalysis\DriverRecommendedRules.ruleset</CodeAnalysisRuleSet>
     <RunCodeAnalysis>true</RunCodeAnalysis>
     <OutDir>$(SolutionDir)$(Platform)\$(ConfigurationName)\Driver\</OutDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <DebuggerFlavor>DbgengKernelDebugger</DebuggerFlavor>
-    <TargetName>dokan$(DOKANAPIVersion)</TargetName>
+    <TargetName>$(DokanBinaryBaseName)</TargetName>
     <CodeAnalysisRuleSet>C:\Program Files (x86)\Windows Kits\10\CodeAnalysis\DriverRecommendedRules.ruleset</CodeAnalysisRuleSet>
     <RunCodeAnalysis>false</RunCodeAnalysis>
     <OutDir>$(SolutionDir)$(Platform)\$(ConfigurationName)\Driver\</OutDir>
@@ -387,7 +387,7 @@
     <ResourceCompile Include="dokanfs_msg.rc" />
   </ItemGroup>
   <ItemGroup>
-    <Inf Include="dokan.inf" />
+    <Inf Include="$(DokanDistributionProfileRoot)\$(DokanGeneratedInfFileName)" />
   </ItemGroup>
   <ItemGroup>
     <CustomBuild Include="dokanfs_msg.mc">

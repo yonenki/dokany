@@ -30,9 +30,9 @@ with this program. If not, see <http://www.gnu.org/licenses/>.
 extern "C" {
 #endif
 
-#define DOKAN_GLOBAL_DEVICE_NAME L"\\\\.\\Dokan_" DOKAN_MAJOR_API_VERSION
+#define DOKAN_GLOBAL_DEVICE_NAME DOKAN_DIST_GLOBAL_DEVICE_WIN32_W
 
-#define DOKAN_DRIVER_SERVICE L"Dokan" DOKAN_MAJOR_API_VERSION
+#define DOKAN_DRIVER_SERVICE DOKAN_DIST_DRIVER_SERVICE_W
 
 #define DOKAN_SERVICE_START 1
 #define DOKAN_SERVICE_STOP 2

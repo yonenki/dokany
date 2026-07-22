@@ -41,3 +41,67 @@ ULONG DOKANAPI DokanDriverVersion() {
 
   return version;
 }
+
+_Success_(return != FALSE)
+BOOL DokanQueryRuntimeIdentity(_In_ HANDLE Device,
+                               _Out_ PDOKAN_RUNTIME_IDENTITY Identity) {
+  DWORD returnedLength = 0;
+  if (Device == NULL || Device == INVALID_HANDLE_VALUE || Identity == NULL) {
+    SetLastError(ERROR_INVALID_PARAMETER);
+    return FALSE;
+  }
+
+  ZeroMemory(Identity, sizeof(*Identity));
+  if (!DeviceIoControl(Device, FSCTL_GET_RUNTIME_IDENTITY, NULL, 0, Identity,
+                       sizeof(*Identity), &returnedLength, NULL)) {
+    return FALSE;
+  }
+  if (returnedLength != sizeof(*Identity) ||
+      Identity->Size != sizeof(*Identity)) {
+    SetLastError(ERROR_INVALID_DATA);
+    return FALSE;
+  }
+  return TRUE;
+}
+
+BOOL DokanIsRuntimeIdentityCompatible(
+    _In_ const DOKAN_RUNTIME_IDENTITY *Identity) {
+  static const GUID expectedFamilyGuid = DOKAN_DIST_FAMILY_GUID_INITIALIZER;
+  static const UCHAR
+      expectedProfileHash[DOKAN_RUNTIME_IDENTITY_PROFILE_HASH_SIZE] =
+          DOKAN_DIST_PROFILE_HASH_BYTES;
+
+  if (Identity == NULL || Identity->Size != sizeof(*Identity) ||
+      Identity->SchemaVersion != DOKAN_DIST_SCHEMA_VERSION ||
+      Identity->ProtocolAbi != DOKAN_DIST_PROTOCOL_ABI ||
+      !(Identity->Capabilities & DOKAN_DRIVER_CAPABILITY_RUNTIME_IDENTITY) ||
+      memcmp(&Identity->FamilyGuid, &expectedFamilyGuid,
+             sizeof(expectedFamilyGuid)) != 0 ||
+      memcmp(Identity->ProfileHash, expectedProfileHash,
+             sizeof(expectedProfileHash)) != 0) {
+    SetLastError(ERROR_REVISION_MISMATCH);
+    return FALSE;
+  }
+  return TRUE;
+}
+
+_Success_(return != FALSE)
+BOOL DOKANAPI DokanGetRuntimeIdentity(
+    _Out_ PDOKAN_RUNTIME_IDENTITY Identity) {
+  ULONG returnedLength = 0;
+  if (Identity == NULL) {
+    SetLastError(ERROR_INVALID_PARAMETER);
+    return FALSE;
+  }
+  ZeroMemory(Identity, sizeof(*Identity));
+  if (!SendToDevice(DOKAN_GLOBAL_DEVICE_NAME, FSCTL_GET_RUNTIME_IDENTITY, NULL,
+                    0, Identity, sizeof(*Identity), &returnedLength)) {
+    return FALSE;
+  }
+  if (returnedLength != sizeof(*Identity) ||
+      Identity->Size != sizeof(*Identity)) {
+    SetLastError(ERROR_INVALID_DATA);
+    return FALSE;
+  }
+  return TRUE;
+}

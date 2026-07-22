@@ -23,9 +23,11 @@ with this program. If not, see <http://www.gnu.org/licenses/>.
 #ifndef PUBLIC_H_
 #define PUBLIC_H_
 
-#ifndef DOKAN_MAJOR_API_VERSION
-#define DOKAN_MAJOR_API_VERSION L"2"
+#include "dokan_distribution_profile.h"
 #include <minwindef.h>
+
+#ifndef DOKAN_MAJOR_API_VERSION
+#define DOKAN_MAJOR_API_VERSION DOKAN_DIST_API_MAJOR_W
 #endif
 
 #define DOKAN_DRIVER_VERSION 0x0000190
@@ -88,13 +90,33 @@ with this program. If not, see <http://www.gnu.org/licenses/>.
 #define FSCTL_GET_CAPABILITIES                                                 \
   CTL_CODE(FILE_DEVICE_FILE_SYSTEM, 0x814, METHOD_BUFFERED, FILE_ANY_ACCESS)
 
+// Retrieve the immutable driver-family identity compiled into this binary.
+#define FSCTL_GET_RUNTIME_IDENTITY                                             \
+  CTL_CODE(FILE_DEVICE_FILE_SYSTEM, 0x815, METHOD_BUFFERED, FILE_ANY_ACCESS)
+
 #define DOKAN_DRIVER_CAPABILITY_DISPATCH_READY (1ULL << 0)
 #define DOKAN_DRIVER_CAPABILITY_START_CANCELLATION (1ULL << 1)
 #define DOKAN_DRIVER_CAPABILITY_MOUNT_MANAGER_STATUS (1ULL << 2)
+#define DOKAN_DRIVER_CAPABILITY_RUNTIME_IDENTITY (1ULL << 3)
 #define DOKAN_DRIVER_CAPABILITIES                                              \
   (DOKAN_DRIVER_CAPABILITY_DISPATCH_READY |                                    \
    DOKAN_DRIVER_CAPABILITY_START_CANCELLATION |                                \
-   DOKAN_DRIVER_CAPABILITY_MOUNT_MANAGER_STATUS)
+   DOKAN_DRIVER_CAPABILITY_MOUNT_MANAGER_STATUS |                              \
+   DOKAN_DRIVER_CAPABILITY_RUNTIME_IDENTITY)
+
+#define DOKAN_RUNTIME_IDENTITY_PROFILE_HASH_SIZE 32
+
+typedef struct _DOKAN_RUNTIME_IDENTITY {
+  ULONG Size;
+  ULONG SchemaVersion;
+  ULONG ProtocolAbi;
+  ULONG DriverVersion;
+  ULONGLONG Capabilities;
+  GUID FamilyGuid;
+  UCHAR ProfileHash[DOKAN_RUNTIME_IDENTITY_PROFILE_HASH_SIZE];
+} DOKAN_RUNTIME_IDENTITY, *PDOKAN_RUNTIME_IDENTITY;
+
+C_ASSERT(sizeof(DOKAN_RUNTIME_IDENTITY) == 72);
 
 #define DRIVER_FUNC_INSTALL 0x01
 #define DRIVER_FUNC_REMOVE 0x02

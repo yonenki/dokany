@@ -9,12 +9,22 @@ function Exec-External {
 }
 
 function Add-VisualStudio-Path {
-	$vsPath = (& "${Env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" -property installationPath).Split([Environment]::NewLine) -like "*\2019\*" | Select -First 1
-	$msBuild_VSPath = "$vsPath\MSBuild\Current\Bin"
-	
-	if (!(Test-Path -Path $msBuild_VSPath)) {
-		throw ("Visual C++ 2019 NOT Installed.")
+	$vsWhere = "${Env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+	if (!(Test-Path -LiteralPath $vsWhere)) {
+		throw "Visual Studio Installer vswhere.exe was not found."
 	}
-	
-	$env:Path += ";$msBuild_VSPath";
+
+	$vsPath = & $vsWhere -latest -products * -requires Microsoft.Component.MSBuild -property installationPath
+	if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($vsPath)) {
+		throw "A launchable Visual Studio installation with MSBuild was not found."
+	}
+
+	$msBuildPath = Join-Path $vsPath "MSBuild\Current\Bin"
+	if (!(Test-Path -LiteralPath $msBuildPath)) {
+		throw "MSBuild was not found below the selected Visual Studio installation: $vsPath"
+	}
+
+	if (($env:Path -split ';') -notcontains $msBuildPath) {
+		$env:Path = "$msBuildPath;$env:Path"
+	}
 }

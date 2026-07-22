@@ -452,6 +452,26 @@ DokanGlobalUserFsRequest(__in PREQUEST_CONTEXT RequestContext) {
       return STATUS_SUCCESS;
     };
 
+    case FSCTL_GET_RUNTIME_IDENTITY: {
+      PDOKAN_RUNTIME_IDENTITY identity;
+      static const GUID familyGuid = DOKAN_DIST_FAMILY_GUID_INITIALIZER;
+      static const UCHAR profileHash[DOKAN_RUNTIME_IDENTITY_PROFILE_HASH_SIZE] =
+          DOKAN_DIST_PROFILE_HASH_BYTES;
+      if (!PREPARE_OUTPUT(RequestContext->Irp, identity,
+                          /*SetInformationOnFailure=*/FALSE)) {
+        return STATUS_BUFFER_TOO_SMALL;
+      }
+      RtlZeroMemory(identity, sizeof(*identity));
+      identity->Size = sizeof(*identity);
+      identity->SchemaVersion = DOKAN_DIST_SCHEMA_VERSION;
+      identity->ProtocolAbi = DOKAN_DIST_PROTOCOL_ABI;
+      identity->DriverVersion = DOKAN_DRIVER_VERSION;
+      identity->Capabilities = DOKAN_DRIVER_CAPABILITIES;
+      identity->FamilyGuid = familyGuid;
+      RtlCopyMemory(identity->ProfileHash, profileHash, sizeof(profileHash));
+      return STATUS_SUCCESS;
+    };
+
     case FSCTL_MOUNTPOINT_CLEANUP:
       RemoveSessionDevices(RequestContext, GetCurrentSessionId(RequestContext));
       return STATUS_SUCCESS;

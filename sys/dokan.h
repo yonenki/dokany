@@ -60,48 +60,31 @@ extern DokanPtr_FsRtlAreThereWaitingFileLocks
 #define DOKAN_DISK_DEVICE_NAME L"\\Device\\Volume"
 #define DOKAN_SYMBOLIC_LINK_NAME L"\\DosDevices\\Global\\Volume"
 
-#ifndef DOKAN_DEVICE_PREFIX_NAME
-#define DOKAN_DEVICE_PREFIX_NAME L"Dokan"
-#endif
 #ifndef DOKAN_GLOBAL_DEVICE_NAME
-#define DOKAN_GLOBAL_DEVICE_NAME \
-  L"\\Device\\" DOKAN_DEVICE_PREFIX_NAME L"_" DOKAN_MAJOR_API_VERSION
+#define DOKAN_GLOBAL_DEVICE_NAME DOKAN_DIST_GLOBAL_DEVICE_NT_W
 #endif
 #ifndef DOKAN_GLOBAL_SYMBOLIC_LINK_NAME
-#define DOKAN_GLOBAL_SYMBOLIC_LINK_NAME                                        \
-  L"\\DosDevices\\Global\\" \
-    DOKAN_DEVICE_PREFIX_NAME L"_" DOKAN_MAJOR_API_VERSION
+#define DOKAN_GLOBAL_SYMBOLIC_LINK_NAME DOKAN_DIST_GLOBAL_SYMBOLIC_LINK_W
 #endif
 #ifndef DOKAN_GLOBAL_FS_DISK_DEVICE_NAME
-#define DOKAN_GLOBAL_FS_DISK_DEVICE_NAME                                       \
-  L"\\Device\\" DOKAN_DEVICE_PREFIX_NAME L"Fs" DOKAN_MAJOR_API_VERSION
+#define DOKAN_GLOBAL_FS_DISK_DEVICE_NAME DOKAN_DIST_FS_DISK_DEVICE_W
 #endif
 #ifndef DOKAN_GLOBAL_FS_CD_DEVICE_NAME
-#define DOKAN_GLOBAL_FS_CD_DEVICE_NAME                                         \
-  L"\\Device\\" DOKAN_DEVICE_PREFIX_NAME L"CdFs" DOKAN_MAJOR_API_VERSION
+#define DOKAN_GLOBAL_FS_CD_DEVICE_NAME DOKAN_DIST_FS_CD_DEVICE_W
 #endif
 #ifndef DOKAN_NET_DEVICE_NAME
-#define DOKAN_NET_DEVICE_NAME                                                  \
-  L"\\Device\\" DOKAN_DEVICE_PREFIX_NAME L"Redirector" DOKAN_MAJOR_API_VERSION
+#define DOKAN_NET_DEVICE_NAME DOKAN_DIST_REDIRECTOR_DEVICE_W
 #endif
 #ifndef DOKAN_NET_SYMBOLIC_LINK_NAME
-#define DOKAN_NET_SYMBOLIC_LINK_NAME                                           \
-  L"\\DosDevices\\Global\\" \
-    DOKAN_DEVICE_PREFIX_NAME L"Redirector" DOKAN_MAJOR_API_VERSION
+#define DOKAN_NET_SYMBOLIC_LINK_NAME DOKAN_DIST_REDIRECTOR_SYMBOLIC_LINK_W
 #endif
 
 #ifndef VOLUME_LABEL
-#define VOLUME_LABEL L"DOKAN"
+#define VOLUME_LABEL DOKAN_DIST_VOLUME_LABEL_W
 #endif
 
-// {D6CC17C5-1734-4085-BCE7-964F1E9F5DE9}
 #ifndef DOKAN_BASE_GUID
-#define DOKAN_BASE_GUID                                                        \
-  {                                                                            \
-    0xd6cc17c5, 0x1734, 0x4085, {                                              \
-      0xbc, 0xe7, 0x96, 0x4f, 0x1e, 0x9f, 0x5d, 0xe9                           \
-    }                                                                          \
-  }
+#define DOKAN_BASE_GUID DOKAN_DIST_VOLUME_BASE_GUID_INITIALIZER
 #endif
 
 #define TAG (ULONG)'AKOD'

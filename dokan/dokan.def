@@ -1,6 +1,4 @@
 
-LIBRARY	dokan2
-
 EXPORTS
 
 ; Preserve the ordinals published by Dokany 2.3.1. New exports must use a new
@@ -39,3 +37,4 @@ DokanUnregisterWaitForFileSystemClosed @29
 DokanCloseHandle @1
 DokanRequestUnmount @33
 DokanCreateFileSystemEx @34
+DokanGetRuntimeIdentity @35

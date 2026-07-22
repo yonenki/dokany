@@ -1010,6 +1010,21 @@ static int DokanCreateFileSystemInternal(
     return DOKAN_DRIVER_INSTALL_ERROR;
   }
 
+  DOKAN_RUNTIME_IDENTITY runtimeIdentity;
+  if (!DokanQueryRuntimeIdentity(dokanInstance->GlobalDevice,
+                                 &runtimeIdentity) ||
+      !DokanIsRuntimeIdentityCompatible(&runtimeIdentity)) {
+    DWORD identityError = GetLastError();
+    DokanDbgPrintW(
+        L"Dokan Error: driver family identity mismatch for %s: %d\n",
+        DOKAN_GLOBAL_DEVICE_NAME, identityError);
+    CloseHandle(dokanInstance->GlobalDevice);
+    dokanInstance->GlobalDevice = INVALID_HANDLE_VALUE;
+    DeleteDokanInstance(dokanInstance);
+    SetLastError(identityError);
+    return DOKAN_VERSION_ERROR;
+  }
+
   DbgPrint("Global device opened\n");
   if (DokanOptions->MountPoint != NULL) {
     wcscpy_s(dokanInstance->MountPoint,
