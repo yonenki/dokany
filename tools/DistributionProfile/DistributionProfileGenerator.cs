@@ -143,7 +143,7 @@ public static class DistributionProfileGenerator
         Class             = DiskDrive
         ClassGuid         = {4d36e967-e325-11ce-bfc1-08002be10318}
         Provider          = %ProviderName%
-        DriverVer         = 01/01/2018,1.0.0.0
+        DriverVer         = {{profile.Release.DriverDate}},{{profile.Release.ProductVersion}}
         CatalogFile       = %DriverName%.cat
         DriverPackageType = FileSystem
         PnpLockdown       = 1
@@ -153,6 +153,18 @@ public static class DistributionProfileGenerator
 
         [DefaultInstall.NT$ARCH$]
         CopyFiles = DokanFileSystem.DriverFiles
+
+        [DefaultInstall.NT$ARCH$.Services]
+        AddService = %ServiceName%,,DokanFileSystem.Service
+
+        [DokanFileSystem.Service]
+        DisplayName    = %ServiceDisplayName%
+        Description    = %ServiceDescription%
+        ServiceBinary  = %12%\%DriverName%.sys
+        ServiceType    = 2
+        StartType      = 3
+        ErrorControl   = 1
+        LoadOrderGroup = "File System"
 
         [SourceDisksNames]
         1 = %Disk1%
@@ -166,6 +178,9 @@ public static class DistributionProfileGenerator
         [Strings]
         ProviderName       = "{{EscapeInf(profile.ProviderName)}}"
         DriverName         = "{{EscapeInf(profile.Family.BinaryBaseName)}}"
+        ServiceName        = "{{EscapeInf(profile.Family.ServiceName)}}"
+        ServiceDisplayName = "{{EscapeInf(profile.DisplayName)}}"
+        ServiceDescription = "{{EscapeInf(profile.DisplayName)}} file system driver"
         Disk1              = "{{EscapeInf(profile.DisplayName)}} installation media"
         """ + Environment.NewLine;
 

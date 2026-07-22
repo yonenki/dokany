@@ -1,5 +1,6 @@
 using System.Text.RegularExpressions;
 using System.Diagnostics.CodeAnalysis;
+using System.Globalization;
 
 namespace Dokany.DistributionProfile;
 
@@ -42,6 +43,16 @@ internal static partial class DistributionProfileValidator
         if (productVersion.Major > 9 || productVersion.Minor > 9 || productVersion.Build > 9)
         {
             Fail("The first three productVersion components must fit Dokan's decimal API version encoding.");
+        }
+
+        if (!DateOnly.TryParseExact(
+                profile.Release.DriverDate,
+                "MM/dd/yyyy",
+                CultureInfo.InvariantCulture,
+                DateTimeStyles.None,
+                out _))
+        {
+            Fail("release.driverDate must use the MM/dd/yyyy INF DriverVer format.");
         }
 
         if (profile.Release.ProtocolAbi <= 0)

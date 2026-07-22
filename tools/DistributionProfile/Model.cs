@@ -24,6 +24,7 @@ public sealed record DistributionProfile
 public sealed record ReleaseIdentity
 {
     public required string ProductVersion { get; init; }
+    public required string DriverDate { get; init; }
     public required int ProtocolAbi { get; init; }
 }
 

@@ -12,7 +12,7 @@ public sealed class DistributionProfileTests
 
     [Theory]
     [InlineData("upstream.json", "dokany", "dokan2", "Dokan2", "Dokan_2")]
-    [InlineData("textil.json", "textil", "textildokan2", "TextilDokan2", "TextilDokan_2")]
+    [InlineData("vendor.json", "acmefs", "acmefs2", "AcmeFs2", "AcmeFs_2")]
     public void LoadsValidatedProfiles(
         string fileName,
         string distributionId,
@@ -21,7 +21,7 @@ public sealed class DistributionProfileTests
         string deviceName)
     {
         var profile = DistributionProfileLoader.Load(
-            Path.Combine(RepositoryRoot, "profiles", fileName));
+            ProfilePath(fileName));
 
         Assert.Equal(distributionId, profile.DistributionId);
         Assert.Equal(binaryBaseName, profile.Family.BinaryBaseName);
@@ -33,7 +33,7 @@ public sealed class DistributionProfileTests
     [Fact]
     public void CanonicalHashDoesNotDependOnJsonFormattingOrPropertyOrder()
     {
-        var originalPath = Path.Combine(RepositoryRoot, "profiles", "textil.json");
+        var originalPath = ProfilePath("vendor.json");
         var original = DistributionProfileLoader.Load(originalPath);
         using var document = JsonDocument.Parse(File.ReadAllText(originalPath));
         var reordered = JsonSerializer.Serialize(
@@ -54,22 +54,29 @@ public sealed class DistributionProfileTests
     }
 
     [Fact]
-    public void TextilProfileGeneratesOneConsistentIdentitySet()
+    public void ExternalVendorProfileGeneratesOneConsistentIdentitySet()
     {
         var profile = DistributionProfileLoader.Load(
-            Path.Combine(RepositoryRoot, "profiles", "textil.json"));
+            ProfilePath("vendor.json"));
         var output = DistributionProfileGenerator.Render(profile);
 
-        Assert.Contains("#define DOKAN_DIST_BINARY_BASENAME_W L\"textildokan2\"", output.Header);
-        Assert.Contains("#define DOKAN_DIST_GLOBAL_DEVICE_WIN32_W L\"\\\\\\\\.\\\\TextilDokan_2\"", output.Header);
-        Assert.Contains("pub const DOKAN_BINARY_BASENAME: &str = \"textildokan2\";", output.RustConstants);
+        Assert.Contains("#define DOKAN_DIST_BINARY_BASENAME_W L\"acmefs2\"", output.Header);
+        Assert.Contains("#define DOKAN_DIST_GLOBAL_DEVICE_WIN32_W L\"\\\\\\\\.\\\\AcmeFs_2\"", output.Header);
+        Assert.Contains("pub const DOKAN_BINARY_BASENAME: &str = \"acmefs2\";", output.RustConstants);
         Assert.Contains($"pub const DOKAN_PROFILE_HASH_HEX: &str = \"{profile.ProfileHash}\";", output.RustConstants);
-        Assert.Contains("<DokanBinaryBaseName>textildokan2</DokanBinaryBaseName>", output.MsBuildProps);
-        Assert.Contains("<DokanControlBaseName>textildokanctl</DokanControlBaseName>", output.MsBuildProps);
-        Assert.Contains("ProviderName       = \"Textil\"", output.Inf);
-        Assert.Contains("DriverName         = \"textildokan2\"", output.Inf);
-        Assert.Equal("textildokan2.inf", output.InfFileName);
-        Assert.Equal("textil", output.RuntimeIdentity.DistributionId);
+        Assert.Contains("<DokanBinaryBaseName>acmefs2</DokanBinaryBaseName>", output.MsBuildProps);
+        Assert.Contains("<DokanControlBaseName>acmectl</DokanControlBaseName>", output.MsBuildProps);
+        Assert.Contains("ProviderName       = \"Acme\"", output.Inf);
+        Assert.Contains("DriverName         = \"acmefs2\"", output.Inf);
+        Assert.Contains("DriverVer         = 07/23/2026,2.3.1.1000", output.Inf);
+        Assert.Contains("[DefaultInstall.NT$ARCH$.Services]", output.Inf);
+        Assert.Contains("AddService = %ServiceName%,,DokanFileSystem.Service", output.Inf);
+        Assert.Contains("ServiceBinary  = %12%\\%DriverName%.sys", output.Inf);
+        Assert.Contains("ServiceType    = 2", output.Inf);
+        Assert.Contains("StartType      = 3", output.Inf);
+        Assert.Contains("ServiceName        = \"AcmeFs2\"", output.Inf);
+        Assert.Equal("acmefs2.inf", output.InfFileName);
+        Assert.Equal("acmefs", output.RuntimeIdentity.DistributionId);
         Assert.Equal(profile.ProfileHash, output.RuntimeIdentity.ProfileHash);
     }
 
@@ -96,19 +103,19 @@ public sealed class DistributionProfileTests
     public void ReleasePackageIsImmutableAndHashesTheSelectedFamilyArtifacts()
     {
         var profile = DistributionProfileLoader.Load(
-            Path.Combine(RepositoryRoot, "profiles", "textil.json"));
+            ProfilePath("vendor.json"));
         var generated = DistributionProfileGenerator.Render(profile);
         using var temporary = new TemporaryDirectory();
         File.WriteAllText(Path.Combine(temporary.Path, "license.lgpl.txt"), "lgpl");
         File.WriteAllText(Path.Combine(temporary.Path, "license.mit.txt"), "mit");
         var artifacts = Path.Combine(temporary.Path, "artifacts");
         Directory.CreateDirectory(artifacts);
-        var dll = Write(artifacts, "textildokan2.dll", "dll");
-        var library = Write(artifacts, "textildokan2.lib", "lib");
-        var driver = Write(artifacts, "textildokan2.sys", "sys");
-        var inf = Write(artifacts, "textildokan2.inf", generated.Inf);
-        var catalog = Write(artifacts, "textildokan2.cat", "cat");
-        var control = Write(artifacts, "textildokanctl.exe", "control");
+        var dll = Write(artifacts, "acmefs2.dll", "dll");
+        var library = Write(artifacts, "acmefs2.lib", "lib");
+        var driver = Write(artifacts, "acmefs2.sys", "sys");
+        var inf = Write(artifacts, "acmefs2.inf", generated.Inf);
+        var catalog = Write(artifacts, "acmefs2.cat", "cat");
+        var control = Write(artifacts, "acmectl.exe", "control");
         var output = Path.Combine(temporary.Path, "package");
 
         var manifest = DistributionPackageBuilder.Create(
@@ -119,10 +126,10 @@ public sealed class DistributionProfileTests
                 temporary.Path));
 
         Assert.Equal(profile.ProfileHash, manifest.ProfileHash);
-        Assert.Equal("runtimeDll", manifest.Files["runtime/textildokan2.dll"].Role);
+        Assert.Equal("runtimeDll", manifest.Files["runtime/acmefs2.dll"].Role);
         Assert.Equal(
             Convert.ToHexString(SHA256.HashData(System.Text.Encoding.UTF8.GetBytes("dll"))).ToLowerInvariant(),
-            manifest.Files["runtime/textildokan2.dll"].Sha256);
+            manifest.Files["runtime/acmefs2.dll"].Sha256);
         Assert.True(File.Exists(Path.Combine(output, "artifact-manifest.json")));
         Assert.Throws<DistributionProfileValidationException>(() => DistributionPackageBuilder.Create(
             profile,
@@ -136,17 +143,17 @@ public sealed class DistributionProfileTests
     public void ReleasePackageRejectsAnInfMutatedAfterProfileGeneration()
     {
         var profile = DistributionProfileLoader.Load(
-            Path.Combine(RepositoryRoot, "profiles", "textil.json"));
+            ProfilePath("vendor.json"));
         var generated = DistributionProfileGenerator.Render(profile);
         using var temporary = new TemporaryDirectory();
         File.WriteAllText(Path.Combine(temporary.Path, "license.lgpl.txt"), "lgpl");
         File.WriteAllText(Path.Combine(temporary.Path, "license.mit.txt"), "mit");
-        var dll = Write(temporary.Path, "textildokan2.dll", "dll");
-        var library = Write(temporary.Path, "textildokan2.lib", "lib");
-        var driver = Write(temporary.Path, "textildokan2.sys", "sys");
-        var inf = Write(temporary.Path, "textildokan2.inf", generated.Inf + "; mutation");
-        var catalog = Write(temporary.Path, "textildokan2.cat", "cat");
-        var control = Write(temporary.Path, "textildokanctl.exe", "control");
+        var dll = Write(temporary.Path, "acmefs2.dll", "dll");
+        var library = Write(temporary.Path, "acmefs2.lib", "lib");
+        var driver = Write(temporary.Path, "acmefs2.sys", "sys");
+        var inf = Write(temporary.Path, "acmefs2.inf", generated.Inf + "; mutation");
+        var catalog = Write(temporary.Path, "acmefs2.cat", "cat");
+        var control = Write(temporary.Path, "acmectl.exe", "control");
 
         var error = Assert.Throws<DistributionProfileValidationException>(() => DistributionPackageBuilder.Create(
             profile,
@@ -194,15 +201,37 @@ public sealed class DistributionProfileTests
         }
     }
 
+    [Fact]
+    public void DriverDateMustUseTheInfDriverVerFormat()
+    {
+        var path = WriteProfileMutation(profile =>
+            profile["release"]!["driverDate"] = "2026-07-23");
+
+        try
+        {
+            var error = Assert.Throws<DistributionProfileValidationException>(
+                () => DistributionProfileLoader.Load(path));
+            Assert.Contains("driverDate", error.Message);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
     private static string WriteProfileMutation(Action<System.Text.Json.Nodes.JsonObject> mutate)
     {
-        var source = Path.Combine(RepositoryRoot, "profiles", "textil.json");
+        var source = ProfilePath("vendor.json");
         var profile = System.Text.Json.Nodes.JsonNode.Parse(File.ReadAllText(source))!.AsObject();
         mutate(profile);
         var path = Path.Combine(Path.GetTempPath(), $"dokany-profile-{Guid.NewGuid():N}.json");
         File.WriteAllText(path, profile.ToJsonString(new JsonSerializerOptions { WriteIndented = true }));
         return path;
     }
+
+    private static string ProfilePath(string fileName) => fileName == "upstream.json"
+        ? Path.Combine(RepositoryRoot, "profiles", fileName)
+        : Path.Combine(RepositoryRoot, "tools", "DistributionProfile.Tests", "Fixtures", fileName);
 
     private static string Write(string directory, string name, string content)
     {

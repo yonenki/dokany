@@ -2,7 +2,8 @@ param (
     [Parameter(Mandatory = $true)]
     [ValidateSet('x64', 'arm64')]
     [string]$Architecture,
-    [string]$DistributionProfile = '.\profiles\textil.json',
+    [Parameter(Mandatory = $true)]
+    [string]$DistributionProfile,
     [string]$Configuration = 'Release',
     [string]$SourceCommit = '',
     [string]$OutputDirectory = '',

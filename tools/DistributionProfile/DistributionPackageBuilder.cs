@@ -74,7 +74,7 @@ public static partial class DistributionPackageBuilder
                 files);
             WriteArtifact(
                 "NOTICE.txt",
-                $"Textil Dokany distribution\nSource: https://github.com/yonenki/dokany/commit/{inputs.SourceCommit}\nProfile: {profile.DistributionId} {profile.ProfileHash}\n",
+                $"{profile.DisplayName}\nSource: https://github.com/yonenki/dokany/commit/{inputs.SourceCommit}\nProfile: {profile.DistributionId} {profile.ProfileHash}\n",
                 "notice",
                 temporary,
                 files);

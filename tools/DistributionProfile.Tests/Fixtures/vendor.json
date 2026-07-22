@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 1,
+  "distributionId": "acmefs",
+  "displayName": "Acme File System Runtime",
+  "providerName": "Acme",
+  "companyName": "Acme Corporation",
+  "apiMajor": 2,
+  "release": {
+    "productVersion": "2.3.1.1000",
+    "driverDate": "07/23/2026",
+    "protocolAbi": 1
+  },
+  "family": {
+    "binaryBaseName": "acmefs2",
+    "controlBaseName": "acmectl",
+    "serviceName": "AcmeFs2",
+    "devicePrefix": "AcmeFs",
+    "eventLogSource": "AcmeFs2",
+    "volumeLabel": "ACME",
+    "familyGuid": "37972C0E-4EA7-40FE-8975-129B9C7F971C",
+    "volumeBaseGuid": "226AF5AC-0F5A-45C9-9766-85A932A62D13",
+    "networkProvider": {
+      "enabled": false,
+      "name": "AcmeFs2",
+      "dllBaseName": "acmefsnp2"
+    }
+  },
+  "installer": {
+    "productCodeX64": "D9E7F2F1-1551-490A-A930-AA26CC9E73A6",
+    "upgradeCodeX64": "B18BA971-56A6-46AB-A673-51B2CDF7CB91",
+    "productCodeX86": "500ABDBA-073E-4659-8EAE-2C58854CB23C",
+    "upgradeCodeX86": "5DA866B0-4904-49E4-8A22-1B0AB80C11A8",
+    "productCodeArm64": "685ACA95-A505-4644-88AA-3AF361FA25DC",
+    "upgradeCodeArm64": "8F7FD62E-BC2A-4C3C-91B4-95DB7F6BD3DA",
+    "providerKey": "A267426B-DAEF-4A44-92AB-6019AA57E9C2",
+    "bundleUpgradeCode": "D121BB82-8254-41FD-B709-C0B4B138EBB8"
+  }
+}
