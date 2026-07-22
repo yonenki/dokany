@@ -72,7 +72,7 @@ try {
         $RuntimePdb = Join-Path $repositoryRoot "$platformDirectory\$Configuration\$binaryBaseName.pdb"
     }
     if ([string]::IsNullOrWhiteSpace($DriverPdb)) {
-        $DriverPdb = Join-Path $repositoryRoot "$platformDirectory\$Configuration\Driver\sys\$binaryBaseName.pdb"
+        $DriverPdb = Join-Path $repositoryRoot "$platformDirectory\$Configuration\Driver\$binaryBaseName.pdb"
     }
     if ([string]::IsNullOrWhiteSpace($ControlPdb)) {
         $ControlPdb = Join-Path $repositoryRoot "$platformDirectory\$Configuration\$controlBaseName.pdb"
