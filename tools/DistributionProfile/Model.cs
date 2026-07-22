@@ -101,6 +101,7 @@ public sealed record RuntimeFamilyManifest(
 
 public sealed record GeneratedDistributionProfile(
     string Header,
+    string RustConstants,
     string MsBuildProps,
     string Inf,
     string InfFileName,

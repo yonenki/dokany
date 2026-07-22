@@ -64,6 +64,7 @@ internal static class DistributionProfileCli
         var files = new Dictionary<string, string>(StringComparer.Ordinal)
         {
             ["dokan_distribution_profile.h"] = output.Header,
+            ["dokan_distribution_profile.rs"] = output.RustConstants,
             ["Dokan.DistributionProfile.props"] = output.MsBuildProps,
             [output.InfFileName] = output.Inf,
             ["version.xml"] = output.VersionXml,

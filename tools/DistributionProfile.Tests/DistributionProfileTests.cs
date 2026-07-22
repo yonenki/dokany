@@ -61,6 +61,8 @@ public sealed class DistributionProfileTests
 
         Assert.Contains("#define DOKAN_DIST_BINARY_BASENAME_W L\"textildokan2\"", output.Header);
         Assert.Contains("#define DOKAN_DIST_GLOBAL_DEVICE_WIN32_W L\"\\\\\\\\.\\\\TextilDokan_2\"", output.Header);
+        Assert.Contains("pub const DOKAN_BINARY_BASENAME: &str = \"textildokan2\";", output.RustConstants);
+        Assert.Contains($"pub const DOKAN_PROFILE_HASH_HEX: &str = \"{profile.ProfileHash}\";", output.RustConstants);
         Assert.Contains("<DokanBinaryBaseName>textildokan2</DokanBinaryBaseName>", output.MsBuildProps);
         Assert.Contains("<DokanControlBaseName>textildokanctl</DokanControlBaseName>", output.MsBuildProps);
         Assert.Contains("ProviderName       = \"Textil\"", output.Inf);
