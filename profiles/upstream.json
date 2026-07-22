@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 1,
+  "distributionId": "dokany",
+  "displayName": "Dokan Library",
+  "providerName": "Dokan",
+  "companyName": "Dokany Project",
+  "apiMajor": 2,
+  "release": {
+    "productVersion": "2.3.1.1000",
+    "protocolAbi": 1
+  },
+  "family": {
+    "binaryBaseName": "dokan2",
+    "controlBaseName": "dokanctl",
+    "serviceName": "Dokan2",
+    "devicePrefix": "Dokan",
+    "eventLogSource": "dokan2",
+    "volumeLabel": "DOKAN",
+    "familyGuid": "F1EFF5FD-3BBC-4E16-B443-2D38BAE76D77",
+    "volumeBaseGuid": "D6CC17C5-1734-4085-BCE7-964F1E9F5DE9",
+    "networkProvider": {
+      "enabled": true,
+      "name": "Dokan2",
+      "dllBaseName": "dokannp2"
+    }
+  },
+  "installer": {
+    "productCodeX64": "9A7325EA-D3C9-0203-0001-250928162350",
+    "upgradeCodeX64": "31A8F445-2AC6-494B-819C-4F4E1B2AECF1",
+    "productCodeX86": "D1680D5B-295F-0203-0001-250928162350",
+    "upgradeCodeX86": "B08DE90A-F064-4ADC-99AC-2EC933417CC5",
+    "productCodeArm64": "24671A98-9A6B-0203-0001-250928162350",
+    "upgradeCodeArm64": "BD055051-AFAD-497D-8297-C4389835870A",
+    "providerKey": "6DE61B71-BBFA-4007-8660-BD13A0DF9004",
+    "bundleUpgradeCode": "F9DD32AC-C2BA-4B2C-841F-B34ABED0A0F1"
+  }
+}

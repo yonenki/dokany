@@ -59,3 +59,4 @@ ReleasePS
 *.log
 *.msi
 *.wixpdb
+/BuildOutput/
