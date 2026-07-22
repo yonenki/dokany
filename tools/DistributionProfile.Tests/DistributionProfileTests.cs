@@ -69,7 +69,11 @@ public sealed class DistributionProfileTests
         Assert.Contains("ProviderName       = \"Acme\"", output.Inf);
         Assert.Contains("DriverName         = \"acmefs2\"", output.Inf);
         Assert.Contains("DriverVer         = 07/23/2026,2.3.1.1000", output.Inf);
-        Assert.Contains("[DefaultInstall.NT$ARCH$.Services]", output.Inf);
+        Assert.DoesNotContain("$ARCH$", output.Inf, StringComparison.Ordinal);
+        Assert.Contains("[DefaultInstall.NTamd64]", output.Inf, StringComparison.Ordinal);
+        Assert.Contains("[DefaultInstall.NTamd64.Services]", output.Inf, StringComparison.Ordinal);
+        Assert.Contains("[DefaultInstall.NTarm64]", output.Inf, StringComparison.Ordinal);
+        Assert.Contains("[DefaultInstall.NTarm64.Services]", output.Inf, StringComparison.Ordinal);
         Assert.Contains("AddService = %ServiceName%,,DokanFileSystem.Service", output.Inf);
         Assert.Contains("DefaultDestDir = 13", output.Inf);
         Assert.Contains("ServiceBinary  = %13%\\%DriverName%.sys", output.Inf);

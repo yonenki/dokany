@@ -21,19 +21,12 @@ param (
 
 $ErrorActionPreference = 'Stop'
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
+Import-Module (Join-Path $PSScriptRoot 'distribution_artifacts.psm1') -Force
 Push-Location $repositoryRoot
 try {
-    $profilePath = (Resolve-Path -LiteralPath $DistributionProfile).Path
-    $profile = (& dotnet run --project .\tools\DistributionProfile\DistributionProfile.csproj -- validate $profilePath) | ConvertFrom-Json
-    if ($LASTEXITCODE -ne 0) { throw "Distribution profile validation failed with exit code $LASTEXITCODE." }
-
-    $generatedRoot = Join-Path $repositoryRoot "BuildOutput\profiles\$($profile.distributionId)-$($profile.profileHash)"
-    & dotnet run --project .\tools\DistributionProfile\DistributionProfile.csproj -- generate $profilePath $generatedRoot | Out-Null
-    if ($LASTEXITCODE -ne 0) { throw "Distribution profile generation failed with exit code $LASTEXITCODE." }
-    $runtimeIdentity = Get-Content -Raw -LiteralPath (Join-Path $generatedRoot 'runtime-identity.json') | ConvertFrom-Json
-    $binaryBaseName = $runtimeIdentity.family.binaryBaseName
-    $controlBaseName = $profile.controlBaseName
-    $platformDirectory = if ($Architecture -eq 'arm64') { 'ARM64' } else { 'x64' }
+    $context = Get-DistributionBuildContext -DistributionProfile $DistributionProfile
+    $profilePath = $context.ProfilePath
+    $profile = $context.Profile
 
     $headCommit = (& git rev-parse HEAD).Trim()
     if ($LASTEXITCODE -ne 0) { throw 'Unable to resolve the source commit.' }
@@ -50,33 +43,28 @@ try {
     if ([string]::IsNullOrWhiteSpace($OutputDirectory)) {
         $OutputDirectory = Join-Path $repositoryRoot "BuildOutput\packages\$($profile.distributionId)-$($profile.profileHash)\$Architecture"
     }
-    if ([string]::IsNullOrWhiteSpace($RuntimeDll)) {
-        $RuntimeDll = Join-Path $repositoryRoot "$platformDirectory\$Configuration\$binaryBaseName.dll"
-    }
-    if ([string]::IsNullOrWhiteSpace($ImportLibrary)) {
-        $ImportLibrary = Join-Path $repositoryRoot "$platformDirectory\$Configuration\$binaryBaseName.lib"
-    }
-    if ([string]::IsNullOrWhiteSpace($Driver)) {
-        $Driver = Join-Path $repositoryRoot "$platformDirectory\$Configuration\Driver\sys\$binaryBaseName.sys"
-    }
-    if ([string]::IsNullOrWhiteSpace($Inf)) {
-        $Inf = Join-Path $generatedRoot "$binaryBaseName.inf"
-    }
-    if ([string]::IsNullOrWhiteSpace($Catalog)) {
-        $Catalog = Join-Path $repositoryRoot "$platformDirectory\$Configuration\Driver\sys\$binaryBaseName.cat"
-    }
-    if ([string]::IsNullOrWhiteSpace($ControlTool)) {
-        $ControlTool = Join-Path $repositoryRoot "$platformDirectory\$Configuration\$controlBaseName.exe"
-    }
-    if ([string]::IsNullOrWhiteSpace($RuntimePdb)) {
-        $RuntimePdb = Join-Path $repositoryRoot "$platformDirectory\$Configuration\$binaryBaseName.pdb"
-    }
-    if ([string]::IsNullOrWhiteSpace($DriverPdb)) {
-        $DriverPdb = Join-Path $repositoryRoot "$platformDirectory\$Configuration\Driver\$binaryBaseName.pdb"
-    }
-    if ([string]::IsNullOrWhiteSpace($ControlPdb)) {
-        $ControlPdb = Join-Path $repositoryRoot "$platformDirectory\$Configuration\$controlBaseName.pdb"
-    }
+    $artifacts = Resolve-DistributionArtifactPaths `
+        -Context $context `
+        -Architecture $Architecture `
+        -Configuration $Configuration `
+        -RuntimeDll $RuntimeDll `
+        -ImportLibrary $ImportLibrary `
+        -Driver $Driver `
+        -Inf $Inf `
+        -Catalog $Catalog `
+        -ControlTool $ControlTool `
+        -RuntimePdb $RuntimePdb `
+        -DriverPdb $DriverPdb `
+        -ControlPdb $ControlPdb
+    $RuntimeDll = $artifacts.RuntimeDll
+    $ImportLibrary = $artifacts.ImportLibrary
+    $Driver = $artifacts.Driver
+    $Inf = $artifacts.Inf
+    $Catalog = $artifacts.Catalog
+    $ControlTool = $artifacts.ControlTool
+    $RuntimePdb = $artifacts.RuntimePdb
+    $DriverPdb = $artifacts.DriverPdb
+    $ControlPdb = $artifacts.ControlPdb
 
     if ($RequireSignatures) {
         foreach ($path in @($RuntimeDll, $Driver, $Catalog, $ControlTool)) {

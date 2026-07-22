@@ -151,10 +151,16 @@ public static class DistributionProfileGenerator
         [DestinationDirs]
         DefaultDestDir = 13
 
-        [DefaultInstall.NT$ARCH$]
+        [DefaultInstall.NTamd64]
         CopyFiles = DokanFileSystem.DriverFiles
 
-        [DefaultInstall.NT$ARCH$.Services]
+        [DefaultInstall.NTamd64.Services]
+        AddService = %ServiceName%,,DokanFileSystem.Service
+
+        [DefaultInstall.NTarm64]
+        CopyFiles = DokanFileSystem.DriverFiles
+
+        [DefaultInstall.NTarm64.Services]
         AddService = %ServiceName%,,DokanFileSystem.Service
 
         [DokanFileSystem.Service]
