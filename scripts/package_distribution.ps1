@@ -13,6 +13,9 @@ param (
     [string]$Inf = '',
     [string]$Catalog = '',
     [string]$ControlTool = '',
+    [string]$RuntimePdb = '',
+    [string]$DriverPdb = '',
+    [string]$ControlPdb = '',
     [switch]$RequireSignatures
 )
 
@@ -65,6 +68,15 @@ try {
     if ([string]::IsNullOrWhiteSpace($ControlTool)) {
         $ControlTool = Join-Path $repositoryRoot "$platformDirectory\$Configuration\$controlBaseName.exe"
     }
+    if ([string]::IsNullOrWhiteSpace($RuntimePdb)) {
+        $RuntimePdb = Join-Path $repositoryRoot "$platformDirectory\$Configuration\$binaryBaseName.pdb"
+    }
+    if ([string]::IsNullOrWhiteSpace($DriverPdb)) {
+        $DriverPdb = Join-Path $repositoryRoot "$platformDirectory\$Configuration\Driver\sys\$binaryBaseName.pdb"
+    }
+    if ([string]::IsNullOrWhiteSpace($ControlPdb)) {
+        $ControlPdb = Join-Path $repositoryRoot "$platformDirectory\$Configuration\$controlBaseName.pdb"
+    }
 
     if ($RequireSignatures) {
         foreach ($path in @($RuntimeDll, $Driver, $Catalog, $ControlTool)) {
@@ -77,7 +89,7 @@ try {
 
     & dotnet run --project .\tools\DistributionProfile\DistributionProfile.csproj -- package `
         $profilePath $Architecture $SourceCommit $OutputDirectory $RuntimeDll $ImportLibrary `
-        $Driver $Inf $Catalog $ControlTool
+        $Driver $Inf $Catalog $ControlTool $RuntimePdb $DriverPdb $ControlPdb
     if ($LASTEXITCODE -ne 0) { throw "Distribution package creation failed with exit code $LASTEXITCODE." }
 }
 finally {

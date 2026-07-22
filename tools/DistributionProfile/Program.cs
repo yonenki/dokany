@@ -53,7 +53,7 @@ internal static class DistributionProfileCli
             return 0;
         }
 
-        if (args.Length is 11 && args[0] == "package")
+        if (args.Length is 14 && args[0] == "package")
         {
             var profile = DistributionProfileLoader.Load(args[1]);
             var output = DistributionProfileGenerator.Render(profile);
@@ -62,6 +62,7 @@ internal static class DistributionProfileCli
                 output,
                 new DistributionPackageInputs(
                     args[2], args[3], args[4], args[5], args[6], args[7], args[8], args[9], args[10],
+                    args[11], args[12], args[13],
                     Directory.GetCurrentDirectory()));
             Console.WriteLine(JsonSerializer.Serialize(manifest, JsonOutput));
             return 0;
@@ -70,7 +71,7 @@ internal static class DistributionProfileCli
         Console.Error.WriteLine("Usage:");
         Console.Error.WriteLine("  DistributionProfile validate <profile.json>");
         Console.Error.WriteLine("  DistributionProfile generate <profile.json> <output-directory>");
-        Console.Error.WriteLine("  DistributionProfile package <profile.json> <x64|arm64> <source-commit> <output-directory> <dll> <lib> <sys> <inf> <cat> <control-exe>");
+        Console.Error.WriteLine("  DistributionProfile package <profile.json> <x64|arm64> <source-commit> <output-directory> <dll> <lib> <sys> <inf> <cat> <control-exe> <runtime-pdb> <driver-pdb> <control-pdb>");
         return 1;
     }
 

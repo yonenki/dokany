@@ -15,6 +15,9 @@ public sealed record DistributionPackageInputs(
     string Inf,
     string Catalog,
     string ControlTool,
+    string RuntimePdb,
+    string DriverPdb,
+    string ControlPdb,
     string RepositoryRoot);
 
 public sealed record DistributionPackageFile(string Role, long Size, string Sha256);
@@ -63,6 +66,9 @@ public static partial class DistributionPackageBuilder
             CopyArtifact(inputs.Inf, $"driver/{profile.Family.BinaryBaseName}.inf", "inf", temporary, files);
             CopyArtifact(inputs.Catalog, $"driver/{profile.Family.BinaryBaseName}.cat", "catalog", temporary, files);
             CopyArtifact(inputs.ControlTool, $"tools/{profile.Family.ControlBaseName}.exe", "controlTool", temporary, files);
+            CopyArtifact(inputs.RuntimePdb, $"symbols/{profile.Family.BinaryBaseName}.dll.pdb", "runtimePdb", temporary, files);
+            CopyArtifact(inputs.DriverPdb, $"symbols/{profile.Family.BinaryBaseName}.sys.pdb", "driverPdb", temporary, files);
+            CopyArtifact(inputs.ControlPdb, $"symbols/{profile.Family.ControlBaseName}.exe.pdb", "controlPdb", temporary, files);
             CopyArtifact(Path.Combine(inputs.RepositoryRoot, "license.lgpl.txt"), "licenses/license.lgpl.txt", "license", temporary, files);
             CopyArtifact(Path.Combine(inputs.RepositoryRoot, "license.mit.txt"), "licenses/license.mit.txt", "license", temporary, files);
 
@@ -126,6 +132,9 @@ public static partial class DistributionPackageBuilder
             [inputs.Inf] = $"{profile.Family.BinaryBaseName}.inf",
             [inputs.Catalog] = $"{profile.Family.BinaryBaseName}.cat",
             [inputs.ControlTool] = $"{profile.Family.ControlBaseName}.exe",
+            [inputs.RuntimePdb] = $"{profile.Family.BinaryBaseName}.pdb",
+            [inputs.DriverPdb] = $"{profile.Family.BinaryBaseName}.pdb",
+            [inputs.ControlPdb] = $"{profile.Family.ControlBaseName}.pdb",
         };
         foreach (var (path, expectedName) in expectedNames)
         {

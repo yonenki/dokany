@@ -117,6 +117,11 @@ public sealed class DistributionProfileTests
         var inf = Write(artifacts, "acmefs2.inf", generated.Inf);
         var catalog = Write(artifacts, "acmefs2.cat", "cat");
         var control = Write(artifacts, "acmectl.exe", "control");
+        var runtimeSymbols = Directory.CreateDirectory(Path.Combine(artifacts, "runtime-symbols")).FullName;
+        var driverSymbols = Directory.CreateDirectory(Path.Combine(artifacts, "driver-symbols")).FullName;
+        var runtimePdb = Write(runtimeSymbols, "acmefs2.pdb", "runtime symbols");
+        var driverPdb = Write(driverSymbols, "acmefs2.pdb", "driver symbols");
+        var controlPdb = Write(artifacts, "acmectl.pdb", "control symbols");
         var output = Path.Combine(temporary.Path, "package");
 
         var manifest = DistributionPackageBuilder.Create(
@@ -124,10 +129,12 @@ public sealed class DistributionProfileTests
             generated,
             new DistributionPackageInputs(
                 "x64", new string('a', 40), output, dll, library, driver, inf, catalog, control,
+                runtimePdb, driverPdb, controlPdb,
                 temporary.Path));
 
         Assert.Equal(profile.ProfileHash, manifest.ProfileHash);
         Assert.Equal("runtimeDll", manifest.Files["runtime/acmefs2.dll"].Role);
+        Assert.Equal("driverPdb", manifest.Files["symbols/acmefs2.sys.pdb"].Role);
         Assert.Equal(
             Convert.ToHexString(SHA256.HashData(System.Text.Encoding.UTF8.GetBytes("dll"))).ToLowerInvariant(),
             manifest.Files["runtime/acmefs2.dll"].Sha256);
@@ -137,6 +144,7 @@ public sealed class DistributionProfileTests
             generated,
             new DistributionPackageInputs(
                 "x64", new string('a', 40), output, dll, library, driver, inf, catalog, control,
+                runtimePdb, driverPdb, controlPdb,
                 temporary.Path)));
     }
 
@@ -155,13 +163,18 @@ public sealed class DistributionProfileTests
         var inf = Write(temporary.Path, "acmefs2.inf", generated.Inf + "; mutation");
         var catalog = Write(temporary.Path, "acmefs2.cat", "cat");
         var control = Write(temporary.Path, "acmectl.exe", "control");
+        var runtimeSymbols = Directory.CreateDirectory(Path.Combine(temporary.Path, "runtime-symbols")).FullName;
+        var driverSymbols = Directory.CreateDirectory(Path.Combine(temporary.Path, "driver-symbols")).FullName;
+        var runtimePdb = Write(runtimeSymbols, "acmefs2.pdb", "runtime symbols");
+        var driverPdb = Write(driverSymbols, "acmefs2.pdb", "driver symbols");
+        var controlPdb = Write(temporary.Path, "acmectl.pdb", "control symbols");
 
         var error = Assert.Throws<DistributionProfileValidationException>(() => DistributionPackageBuilder.Create(
             profile,
             generated,
             new DistributionPackageInputs(
                 "x64", new string('b', 40), Path.Combine(temporary.Path, "package"), dll, library,
-                driver, inf, catalog, control, temporary.Path)));
+                driver, inf, catalog, control, runtimePdb, driverPdb, controlPdb, temporary.Path)));
 
         Assert.Contains("INF differs", error.Message, StringComparison.Ordinal);
     }
