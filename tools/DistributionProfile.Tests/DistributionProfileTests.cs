@@ -125,6 +125,18 @@ public sealed class DistributionProfileTests
         Assert.Equal(first.RuntimeIdentity, second.RuntimeIdentity);
     }
 
+    [Theory]
+    [InlineData("")]
+    [InlineData("abc123")]
+    [InlineData("gggggggggggggggggggggggggggggggggggggggg")]
+    public void SourceBuildIdentityRequiresAFullGitObjectId(string value)
+    {
+        var error = Assert.Throws<DistributionProfileValidationException>(
+            () => SourceBuildIdentity.Parse(value));
+
+        Assert.Contains("40-character Git object ID", error.Message, StringComparison.Ordinal);
+    }
+
     [Fact]
     public void ReleasePackageIsImmutableAndHashesTheSelectedFamilyArtifacts()
     {
