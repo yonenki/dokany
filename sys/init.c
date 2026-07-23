@@ -93,15 +93,14 @@ InsertDeviceToDelete(PDOKAN_GLOBAL dokanGlobal, PDEVICE_OBJECT DiskDeviceObject,
 
   InitializeListHead(&deviceEntry->ListEntry);
 
-  if (lockGlobal) {
-    ExAcquireResourceExclusiveLite(&dokanGlobal->Resource, TRUE);
-  }
-
+  // The delete worker removes entries under dokanGlobal->Resource, so
+  // insertions must be serialized by the same lock. Passing lockGlobal ==
+  // FALSE (as all call sites did) allowed concurrent unmounts and the
+  // delete worker to corrupt the list (textil#2196).
+  UNREFERENCED_PARAMETER(lockGlobal);
+  ExAcquireResourceExclusiveLite(&dokanGlobal->Resource, TRUE);
   InsertTailList(&dokanGlobal->DeviceDeleteList, &deviceEntry->ListEntry);
-
-  if (lockGlobal) {
-    ExReleaseResourceLite(&dokanGlobal->Resource);
-  }
+  ExReleaseResourceLite(&dokanGlobal->Resource);
   KeSetEvent(&dokanGlobal->DeleteDeviceEvent, IO_NO_INCREMENT, FALSE);
   return deviceEntry;
 }
