@@ -180,6 +180,7 @@ typedef struct _DOKAN_GLOBAL {
 
   LIST_ENTRY DeviceDeleteList;
   KEVENT KillDeleteDeviceEvent;
+  KEVENT DeleteDeviceEvent;
 
   ULONG DriverVersion;
   
@@ -818,7 +819,6 @@ typedef struct _DEVICE_ENTRY {
   PDEVICE_OBJECT DiskDeviceObject;
   PDEVICE_OBJECT VolumeDeviceObject;
   ULONG SessionId;
-  ULONG Counter;
   UNICODE_STRING MountPoint;
 } DEVICE_ENTRY, *PDEVICE_ENTRY;
 

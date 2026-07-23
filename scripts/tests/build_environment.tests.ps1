@@ -51,6 +51,8 @@ try {
 
 $repositoryRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..'))
 $dokanRuntimeSource = Get-Content -Raw -LiteralPath (Join-Path $repositoryRoot 'dokan\dokan.c')
+$driverHeaderSource = Get-Content -Raw -LiteralPath (Join-Path $repositoryRoot 'sys\dokan.h')
+$driverInitializationSource = Get-Content -Raw -LiteralPath (Join-Path $repositoryRoot 'sys\init.c')
 Assert-True (
     $dokanRuntimeSource.Contains('NamespacePathsEqual(volumeName, finalGuidPath)')) `
     'Mount Manager readiness does not compare the assigned volume GUID with the handle GUID'
@@ -60,6 +62,20 @@ Assert-True (
 Assert-True (
     -not $dokanRuntimeSource.Contains('VOLUME_NAME_DOS')) `
     'Mount Manager readiness still requires an arbitrary DOS alias to equal the requested mount point'
+Assert-True (
+    -not $driverHeaderSource.Contains('ULONG Counter;')) `
+    'Unmounted devices still carry an arbitrary delayed-delete counter'
+Assert-True (
+    -not $driverInitializationSource.Contains('deviceEntry->Counter')) `
+    'Unmounted devices still wait for arbitrary timer cycles after their references reach zero'
+Assert-True (
+    $driverInitializationSource.Contains('KeSetEvent(&dokanGlobal->DeleteDeviceEvent')) `
+    'Queueing an unmounted device does not wake the device-deletion worker'
+$clearVpbIndex = $driverInitializationSource.IndexOf('deviceEntry->DiskDeviceObject->Vpb->DeviceObject = NULL')
+$deleteDiskDeviceIndex = $driverInitializationSource.IndexOf('IoDeleteDevice(deviceEntry->DiskDeviceObject)')
+Assert-True (
+    $clearVpbIndex -ge 0 -and $deleteDiskDeviceIndex -gt $clearVpbIndex) `
+    'Delayed deletion accesses the disk device VPB after IoDeleteDevice'
 $solutionSource = Get-Content -Raw -LiteralPath (Join-Path $repositoryRoot 'dokan.sln')
 $projectMatches = [regex]::Matches($solutionSource, '"([^"\r\n]+\.vcxproj)"')
 Assert-True ($projectMatches.Count -gt 0) 'dokan.sln contains no C++ projects'
