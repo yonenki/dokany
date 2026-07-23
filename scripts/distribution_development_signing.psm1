@@ -163,6 +163,29 @@ function Assert-AuthenticodeSignature {
     }
 }
 
+function Assert-DistributionCatalogMembership {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)][string]$Catalog,
+        [Parameter(Mandatory = $true)][string[]]$Inputs,
+        [string]$SignTool = ''
+    )
+
+    Assert-ExistingSigningInput -Path $Catalog
+    if ($Inputs.Count -eq 0) {
+        throw [System.ArgumentException]::new(
+            'At least one catalog input must be supplied.', 'Inputs')
+    }
+    $resolvedSignTool = Resolve-WindowsKitTool -Name 'signtool.exe' -ExplicitPath $SignTool
+    foreach ($inputPath in $Inputs) {
+        Assert-ExistingSigningInput -Path $inputPath
+        Invoke-CheckedNativeTool `
+            -Path $resolvedSignTool `
+            -Arguments @('verify', '/v', '/pa', '/c', $Catalog, $inputPath) `
+            -Operation "Verifying catalog membership for $inputPath"
+    }
+}
+
 function Invoke-DistributionDevelopmentSigning {
     [CmdletBinding()]
     param(
@@ -260,12 +283,10 @@ function Invoke-DistributionDevelopmentSigning {
                 -Arguments @('verify', '/v', '/pa', $target) `
                 -Operation "Verifying $target"
         }
-        foreach ($catalogInput in @($stagedInf, $stagedDriver)) {
-            Invoke-CheckedNativeTool `
-                -Path $resolvedSignTool `
-                -Arguments @('verify', '/v', '/pa', '/c', $plan.Catalog, $catalogInput) `
-                -Operation "Verifying catalog membership for $catalogInput"
-        }
+        Assert-DistributionCatalogMembership `
+            -Catalog $plan.Catalog `
+            -Inputs @($stagedInf, $stagedDriver) `
+            -SignTool $resolvedSignTool
     }
     finally {
         $resolvedStagingRoot = [System.IO.Path]::GetFullPath($stagingRoot)
@@ -285,4 +306,4 @@ function Invoke-DistributionDevelopmentSigning {
     }
 }
 
-Export-ModuleMember -Function New-DistributionDevelopmentSigningPlan, Invoke-DistributionDevelopmentSigning
+Export-ModuleMember -Function New-DistributionDevelopmentSigningPlan, Invoke-DistributionDevelopmentSigning, Assert-DistributionCatalogMembership

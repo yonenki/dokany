@@ -16,12 +16,14 @@ param (
     [string]$RuntimePdb = '',
     [string]$DriverPdb = '',
     [string]$ControlPdb = '',
+    [string]$SignTool = '',
     [switch]$RequireSignatures
 )
 
 $ErrorActionPreference = 'Stop'
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 Import-Module (Join-Path $PSScriptRoot 'distribution_artifacts.psm1') -Force
+Import-Module (Join-Path $PSScriptRoot 'distribution_development_signing.psm1') -Force
 Push-Location $repositoryRoot
 try {
     $context = Get-DistributionBuildContext -DistributionProfile $DistributionProfile
@@ -73,6 +75,10 @@ try {
                 throw "Required Authenticode signature is not valid for ${path}: $($signature.Status)"
             }
         }
+        Assert-DistributionCatalogMembership `
+            -Catalog $Catalog `
+            -Inputs @($Inf, $Driver) `
+            -SignTool $SignTool
     }
 
     & dotnet run --project .\tools\DistributionProfile\DistributionProfile.csproj -- package `
