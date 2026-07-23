@@ -9,6 +9,8 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/) and this p
 - Library - Add `DokanRequestUnmount` to request a non-blocking unmount of an exact filesystem instance.
 - Library - Add `DokanCreateFileSystemEx` with cooperative startup cancellation.
 - Kernel/Library - Add negotiated dispatch-ready and startup-cancellation protocol capabilities without changing legacy protocol structures.
+- Library - Add `DOKAN_OPTIONS.ThreadCount` (Version >= 232) to control the per-mount event pull thread count.
+- Tests - Add dynamic security regression suite in `scripts/tests/security/` covering the event-channel, rename-Ex, device-delete, query-security, and scaling PoCs.
 
 ### Fixed
 - Library - Make `DokanCloseHandle` unmount its exact filesystem instance instead of looking it up by mount point.
