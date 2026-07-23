@@ -110,6 +110,16 @@ Assert-True (
     $stopDeleteThreadIndex -ge 0 -and $deleteGlobalDeviceIndex -gt $stopDeleteThreadIndex) `
     'Global teardown deletes the worker context before the device-deletion thread stops'
 Assert-True (
+    $driverRuntimeSource.Contains('deviceObject = deviceObject->NextDevice') -and
+    $driverRuntimeSource.Contains('deviceObject->DeviceExtension != NULL')) `
+    'Driver unload assumes the first device object owns the global extension'
+$deleteGlobalResourceIndex =
+    $driverRuntimeSource.IndexOf('ExDeleteResourceLite(&dokanGlobal->Resource)')
+Assert-True (
+    $deleteGlobalResourceIndex -ge 0 -and
+    $deleteGlobalDeviceIndex -gt $deleteGlobalResourceIndex) `
+    'Global teardown accesses the device extension after deleting its device object'
+Assert-True (
     $driverPublicHeaderSource.Contains('FSCTL_PREPARE_UNLOAD')) `
     'The driver protocol does not expose explicit unload preparation'
 Assert-True (

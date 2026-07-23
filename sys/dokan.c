@@ -189,12 +189,12 @@ VOID CleanupGlobalDiskDevice(PDOKAN_GLOBAL dokanGlobal) {
 
   DokanUnregisterFileSystems(dokanGlobal);
 
-  IoDeleteDevice(dokanGlobal->FsDiskDeviceObject);
-  IoDeleteDevice(dokanGlobal->FsCdDeviceObject);
-  IoDeleteDevice(dokanGlobal->DeviceObject);
   ExDeleteResourceLite(&dokanGlobal->Resource);
   ExDeleteResourceLite(&dokanGlobal->MountPointListLock);
   ExDeleteResourceLite(&dokanGlobal->MountManagerLock);
+  IoDeleteDevice(dokanGlobal->FsDiskDeviceObject);
+  IoDeleteDevice(dokanGlobal->FsCdDeviceObject);
+  IoDeleteDevice(dokanGlobal->DeviceObject);
 }
 
 VOID InitMultiVersionResources() {
@@ -382,13 +382,20 @@ Return Value:
 
 {
 
-  PDEVICE_OBJECT deviceObject = DriverObject->DeviceObject;
-  PDOKAN_GLOBAL dokanGlobal;
+  PDEVICE_OBJECT deviceObject;
+  PDOKAN_GLOBAL dokanGlobal = NULL;
 
   PAGED_CODE();
 
-  dokanGlobal = deviceObject->DeviceExtension;
-  if (GetIdentifierType(dokanGlobal) == DGL) {
+  for (deviceObject = DriverObject->DeviceObject; deviceObject != NULL;
+       deviceObject = deviceObject->NextDevice) {
+    if (deviceObject->DeviceExtension != NULL &&
+        GetIdentifierType(deviceObject->DeviceExtension) == DGL) {
+      dokanGlobal = deviceObject->DeviceExtension;
+      break;
+    }
+  }
+  if (dokanGlobal != NULL) {
     DOKAN_LOG("Delete Global DeviceObject");
     CleanupGlobalDiskDevice(dokanGlobal);
   }
