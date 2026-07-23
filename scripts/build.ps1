@@ -4,7 +4,9 @@ param (
 	[string[]]$Configurations = @('Release', 'Debug'),
 	[string]$DistributionProfile = '.\profiles\upstream.json',
 	[string]$PlatformToolset = '',
-	[string]$WindowsTargetPlatformVersion = ''
+	[string]$WindowsTargetPlatformVersion = '',
+	[ValidateSet('Off', 'TestSign', 'ProductionSign')]
+	[string]$DriverSignMode = 'Off'
 )
 
 . .\scripts\build_helper.ps1
@@ -67,7 +69,7 @@ if ($BuildPart -contains 'win') {
 	foreach ($Configuration in $Configurations) {
 		foreach ($Platform in $Platforms) {
 			Write-Host Build dokan $Configuration $Platform ...
-			Exec-External { buildWrapper .\dokan.sln /p:Configuration=$Configuration /p:Platform=$Platform /p:PlatformToolset=$PlatformToolset /p:WindowsTargetPlatformVersion=$WindowsTargetPlatformVersion /p:DokanDistributionProfileRoot="$distributionProfileRoot" /t:Build $ciBuildArgument }
+			Exec-External { buildWrapper .\dokan.sln /p:Configuration=$Configuration /p:Platform=$Platform /p:PlatformToolset=$PlatformToolset /p:WindowsTargetPlatformVersion=$WindowsTargetPlatformVersion /p:DokanDistributionProfileRoot="$distributionProfileRoot" /p:SignMode=$DriverSignMode /t:Build $ciBuildArgument }
 			Write-Host Build dokan $Configuration $Platform done !
 		}
 	}

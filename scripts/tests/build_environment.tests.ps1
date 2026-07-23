@@ -20,6 +20,9 @@ foreach ($setting in @('DOTNET_NOLOGO', 'DOTNET_CLI_TELEMETRY_OPTOUT')) {
 
 Assert-True ($buildSource.Contains('$ciBuildArgument = $null')) 'Non-AppVeyor builds do not initialize the optional CI logger argument'
 Assert-True (-not $buildSource.Contains('$CI_BUILD_ARG')) 'The legacy conditionally initialized CI argument remains in build.ps1'
+Assert-True ($buildSource.Contains("[ValidateSet('Off', 'TestSign', 'ProductionSign')]")) 'Driver signing mode is not constrained to WDK signing modes'
+Assert-True ($buildSource.Contains("[string]`$DriverSignMode = 'Off'")) 'Driver signing is not deterministic by default'
+Assert-True ($buildSource.Contains('/p:SignMode=$DriverSignMode')) 'The selected driver signing mode is not passed to MSBuild'
 
 $originalProcessorArchitecture = $env:PROCESSOR_ARCHITECTURE
 $originalProcessorArchitectureW6432 = $env:PROCESSOR_ARCHITEW6432
@@ -89,5 +92,13 @@ $driverTargetVersions = @($driverProject.SelectNodes(
 Assert-True (
     $driverTargetVersions.Count -eq 1 -and $driverTargetVersions[0] -ceq 'Windows10') `
     'The driver configurations do not consistently target the supported Windows baseline'
+$driverDigestAlgorithms = @($driverProject.SelectNodes(
+        '//msbuild:ItemDefinitionGroup/msbuild:DriverSign/msbuild:FileDigestAlgorithm',
+        $driverNamespaceManager) |
+    ForEach-Object { $_.InnerText } |
+    Select-Object -Unique)
+Assert-True (
+    $driverDigestAlgorithms.Count -eq 1 -and $driverDigestAlgorithms[0] -ceq 'sha256') `
+    'WDK-managed driver signing does not explicitly use SHA-256 file digests'
 
 Write-Host 'Build environment tests passed.'
