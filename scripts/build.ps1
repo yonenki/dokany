@@ -54,7 +54,10 @@ $distributionProfileRoot = Join-Path (Resolve-Path .).Path "BuildOutput\profiles
 Exec-External { dotnet run --project .\tools\DistributionProfile\DistributionProfile.csproj -- generate $distributionProfilePath $distributionProfileRoot }
 $env:DOKAN_DISTRIBUTION_PROFILE_ROOT = $distributionProfileRoot
 
-if ($env:APPVEYOR -eq "True") { $CI_BUILD_ARG="/l:C:\Program Files\AppVeyor\BuildAgent\Appveyor.MSBuildLogger.dll" }
+$ciBuildArgument = $null
+if ($env:APPVEYOR -eq "True") {
+	$ciBuildArgument = "/l:C:\Program Files\AppVeyor\BuildAgent\Appveyor.MSBuildLogger.dll"
+}
 $msBuildPath=& Get-Command msbuild | Select-Object -ExpandProperty Definition
 if (!([bool](Get-Command -Name buildWrapper -ErrorAction SilentlyContinue))) {
 	set-alias buildWrapper "$msBuildPath"
@@ -64,7 +67,7 @@ if ($BuildPart -contains 'win') {
 	foreach ($Configuration in $Configurations) {
 		foreach ($Platform in $Platforms) {
 			Write-Host Build dokan $Configuration $Platform ...
-			Exec-External { buildWrapper .\dokan.sln /p:Configuration=$Configuration /p:Platform=$Platform /p:PlatformToolset=$PlatformToolset /p:WindowsTargetPlatformVersion=$WindowsTargetPlatformVersion /p:DokanDistributionProfileRoot="$distributionProfileRoot" /t:Build $CI_BUILD_ARG }
+			Exec-External { buildWrapper .\dokan.sln /p:Configuration=$Configuration /p:Platform=$Platform /p:PlatformToolset=$PlatformToolset /p:WindowsTargetPlatformVersion=$WindowsTargetPlatformVersion /p:DokanDistributionProfileRoot="$distributionProfileRoot" /t:Build $ciBuildArgument }
 			Write-Host Build dokan $Configuration $Platform done !
 		}
 	}

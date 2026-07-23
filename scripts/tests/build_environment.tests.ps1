@@ -16,4 +16,7 @@ foreach ($setting in @('DOTNET_NOLOGO', 'DOTNET_CLI_TELEMETRY_OPTOUT')) {
     Assert-True ($settingIndex -lt $firstDotnetInvocation) "$setting is set after the first dotnet invocation"
 }
 
+Assert-True ($buildSource.Contains('$ciBuildArgument = $null')) 'Non-AppVeyor builds do not initialize the optional CI logger argument'
+Assert-True (-not $buildSource.Contains('$CI_BUILD_ARG')) 'The legacy conditionally initialized CI argument remains in build.ps1'
+
 Write-Host 'Build environment tests passed.'
