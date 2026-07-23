@@ -19,4 +19,14 @@ foreach ($setting in @('DOTNET_NOLOGO', 'DOTNET_CLI_TELEMETRY_OPTOUT')) {
 Assert-True ($buildSource.Contains('$ciBuildArgument = $null')) 'Non-AppVeyor builds do not initialize the optional CI logger argument'
 Assert-True (-not $buildSource.Contains('$CI_BUILD_ARG')) 'The legacy conditionally initialized CI argument remains in build.ps1'
 
+$repositoryRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..'))
+$solutionSource = Get-Content -Raw -LiteralPath (Join-Path $repositoryRoot 'dokan.sln')
+$projectMatches = [regex]::Matches($solutionSource, '"([^"\r\n]+\.vcxproj)"')
+Assert-True ($projectMatches.Count -gt 0) 'dokan.sln contains no C++ projects'
+foreach ($projectMatch in $projectMatches) {
+    $projectPath = Join-Path $repositoryRoot $projectMatch.Groups[1].Value
+    $projectSource = Get-Content -Raw -LiteralPath $projectPath
+    Assert-True ($projectSource.Contains('Dokan.props')) "$($projectMatch.Groups[1].Value) does not import the distribution profile properties"
+}
+
 Write-Host 'Build environment tests passed.'
