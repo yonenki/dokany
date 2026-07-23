@@ -8,6 +8,19 @@ function Exec-External {
   }
 }
 
+function Get-NativeMsBuildHostDirectory {
+	$nativeArchitecture = if ([string]::IsNullOrWhiteSpace($env:PROCESSOR_ARCHITEW6432)) {
+		$env:PROCESSOR_ARCHITECTURE
+	} else {
+		$env:PROCESSOR_ARCHITEW6432
+	}
+	switch ($nativeArchitecture.ToUpperInvariant()) {
+		'AMD64' { return 'amd64' }
+		'ARM64' { return 'arm64' }
+		default { throw "Unsupported Visual Studio build host architecture: $nativeArchitecture" }
+	}
+}
+
 function Add-VisualStudio-Path {
 	$vsWhere = "${Env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
 	if (!(Test-Path -LiteralPath $vsWhere)) {
@@ -19,7 +32,8 @@ function Add-VisualStudio-Path {
 		throw "A launchable Visual Studio installation with MSBuild was not found."
 	}
 
-	$msBuildPath = Join-Path $vsPath "MSBuild\Current\Bin"
+	$msBuildHostDirectory = Get-NativeMsBuildHostDirectory
+	$msBuildPath = Join-Path $vsPath "MSBuild\Current\Bin\$msBuildHostDirectory"
 	if (!(Test-Path -LiteralPath $msBuildPath)) {
 		throw "MSBuild was not found below the selected Visual Studio installation: $vsPath"
 	}

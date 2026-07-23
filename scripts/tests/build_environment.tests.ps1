@@ -8,6 +8,8 @@ function Assert-True([bool]$Actual, [string]$Message) {
 $buildScriptPath = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\build.ps1'))
 $buildSource = Get-Content -Raw -LiteralPath $buildScriptPath
 $firstDotnetInvocation = $buildSource.IndexOf('& dotnet run', [System.StringComparison]::Ordinal)
+$buildHelperPath = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\build_helper.ps1'))
+. $buildHelperPath
 
 Assert-True ($firstDotnetInvocation -ge 0) 'build.ps1 does not invoke the distribution profile generator'
 foreach ($setting in @('DOTNET_NOLOGO', 'DOTNET_CLI_TELEMETRY_OPTOUT')) {
@@ -18,6 +20,31 @@ foreach ($setting in @('DOTNET_NOLOGO', 'DOTNET_CLI_TELEMETRY_OPTOUT')) {
 
 Assert-True ($buildSource.Contains('$ciBuildArgument = $null')) 'Non-AppVeyor builds do not initialize the optional CI logger argument'
 Assert-True (-not $buildSource.Contains('$CI_BUILD_ARG')) 'The legacy conditionally initialized CI argument remains in build.ps1'
+
+$originalProcessorArchitecture = $env:PROCESSOR_ARCHITECTURE
+$originalProcessorArchitectureW6432 = $env:PROCESSOR_ARCHITEW6432
+try {
+    $env:PROCESSOR_ARCHITECTURE = 'AMD64'
+    $env:PROCESSOR_ARCHITEW6432 = $null
+    Assert-True ((Get-NativeMsBuildHostDirectory) -ceq 'amd64') 'x64 hosts do not select 64-bit MSBuild'
+
+    $env:PROCESSOR_ARCHITECTURE = 'x86'
+    $env:PROCESSOR_ARCHITEW6432 = 'ARM64'
+    Assert-True ((Get-NativeMsBuildHostDirectory) -ceq 'arm64') 'ARM64 hosts do not select native MSBuild'
+
+    $env:PROCESSOR_ARCHITECTURE = 'x86'
+    $env:PROCESSOR_ARCHITEW6432 = $null
+    $unsupportedHostRejected = $false
+    try {
+        Get-NativeMsBuildHostDirectory | Out-Null
+    } catch {
+        $unsupportedHostRejected = $true
+    }
+    Assert-True $unsupportedHostRejected 'Unsupported 32-bit build hosts do not fail closed'
+} finally {
+    $env:PROCESSOR_ARCHITECTURE = $originalProcessorArchitecture
+    $env:PROCESSOR_ARCHITEW6432 = $originalProcessorArchitectureW6432
+}
 
 $repositoryRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..'))
 $solutionSource = Get-Content -Raw -LiteralPath (Join-Path $repositoryRoot 'dokan.sln')
