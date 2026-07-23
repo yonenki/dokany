@@ -55,6 +55,10 @@ $driverRuntimeSource = Get-Content -Raw -LiteralPath (Join-Path $repositoryRoot 
 $driverHeaderSource = Get-Content -Raw -LiteralPath (Join-Path $repositoryRoot 'sys\dokan.h')
 $driverInitializationSource = Get-Content -Raw -LiteralPath (Join-Path $repositoryRoot 'sys\init.c')
 $driverFileSystemControlSource = Get-Content -Raw -LiteralPath (Join-Path $repositoryRoot 'sys\fscontrol.c')
+$driverEventSource = Get-Content -Raw -LiteralPath (Join-Path $repositoryRoot 'sys\event.c')
+$driverPublicHeaderSource = Get-Content -Raw -LiteralPath (Join-Path $repositoryRoot 'sys\public.h')
+$dokanControlSource = Get-Content -Raw -LiteralPath (Join-Path $repositoryRoot 'dokan_control\dokanctl.c')
+$dokanExportsSource = Get-Content -Raw -LiteralPath (Join-Path $repositoryRoot 'dokan\dokan.def')
 Assert-True (
     $dokanRuntimeSource.Contains('NamespacePathsEqual(volumeName, finalGuidPath)')) `
     'Mount Manager readiness does not compare the assigned volume GUID with the handle GUID'
@@ -105,6 +109,30 @@ $deleteGlobalDeviceIndex = $driverRuntimeSource.IndexOf('IoDeleteDevice(dokanGlo
 Assert-True (
     $stopDeleteThreadIndex -ge 0 -and $deleteGlobalDeviceIndex -gt $stopDeleteThreadIndex) `
     'Global teardown deletes the worker context before the device-deletion thread stops'
+Assert-True (
+    $driverPublicHeaderSource.Contains('FSCTL_PREPARE_UNLOAD')) `
+    'The driver protocol does not expose explicit unload preparation'
+Assert-True (
+    $driverHeaderSource.Contains('volatile LONG UnloadPending;') -and
+    $driverHeaderSource.Contains('volatile LONG FileSystemsRegistered;')) `
+    'Global state does not model unload preparation and file-system registration ownership'
+Assert-True (
+    $driverFileSystemControlSource.Contains('SeSinglePrivilegeCheck') -and
+    $driverFileSystemControlSource.Contains('DokanPrepareForUnload(RequestContext->DokanGlobal)')) `
+    'Unload preparation is not privilege-gated at the driver boundary'
+Assert-True (
+    $driverEventSource.Contains('RequestContext->DokanGlobal->UnloadPending')) `
+    'Mount startup is not rejected after unload preparation begins'
+Assert-True (
+    $driverInitializationSource.Contains('IsListEmpty(&dokanGlobal->MountPointList)') -and
+    $driverInitializationSource.Contains('IsListEmpty(&dokanGlobal->DeviceDeleteList)') -and
+    $driverInitializationSource.Contains('DokanUnregisterFileSystems(dokanGlobal)')) `
+    'Unload preparation does not require empty mount state before unregistering the file system'
+Assert-True (
+    $dokanRuntimeSource.Contains('DokanPrepareDriverUnload') -and
+    $dokanControlSource.Contains("case L'p':") -and
+    $dokanExportsSource.Contains('DokanPrepareDriverUnload @36')) `
+    'The generic control tool cannot request the driver unload-preparation contract'
 $solutionSource = Get-Content -Raw -LiteralPath (Join-Path $repositoryRoot 'dokan.sln')
 $projectMatches = [regex]::Matches($solutionSource, '"([^"\r\n]+\.vcxproj)"')
 Assert-True ($projectMatches.Count -gt 0) 'dokan.sln contains no C++ projects'

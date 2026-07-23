@@ -43,6 +43,7 @@ int ShowUsage() {
           "dokanctl /i [d|n|a]\n"
           "dokanctl /r [d|n|a]\n"
           "dokanctl /q\n"
+          "dokanctl /p\n"
           "dokanctl /v\n"
           "\n"
           "Example:\n"
@@ -55,6 +56,7 @@ int ShowUsage() {
           "  /l a                : List current mount points\n"
           "  /d [0-7]            : Enable Kernel Debug output\n"
           "  /q                  : Print runtime identity as JSON\n"
+          "  /p                  : Prepare driver for service stop\n"
           "  /v                  : Print Dokan version\n");
   return EXIT_FAILURE;
 }
@@ -166,7 +168,8 @@ int __cdecl wmain(int argc, PWCHAR argv[]) {
   }
 
   if (!isAdmin &&
-      (option == L'i' || option == L'r' || option == L'd' || option == L'u')) {
+      (option == L'i' || option == L'r' || option == L'd' || option == L'u' ||
+       option == L'p')) {
     fprintf(stderr, "Admin rights required to process this operation\n");
     return EXIT_FAILURE;
   }
@@ -270,6 +273,16 @@ int __cdecl wmain(int argc, PWCHAR argv[]) {
 
   case L'q':
     return PrintRuntimeIdentity();
+
+  case L'p': {
+    if (DokanPrepareDriverUnload()) {
+      fprintf(stdout, "Driver is prepared for service stop\n");
+      return EXIT_SUCCESS;
+    }
+    DWORD error = GetLastError();
+    fprintf(stderr, "Driver unload preparation failed: %lu\n", error);
+    return error == ERROR_BUSY ? ERROR_BUSY : EXIT_FAILURE;
+  }
 
   case L'v': {
     fprintf(stdout, "dokanctl : %s %s\n", __DATE__, __TIME__);

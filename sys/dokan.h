@@ -181,6 +181,8 @@ typedef struct _DOKAN_GLOBAL {
   LIST_ENTRY DeviceDeleteList;
   KEVENT KillDeleteDeviceEvent;
   KEVENT DeleteDeviceEvent;
+  volatile LONG UnloadPending;
+  volatile LONG FileSystemsRegistered;
 
   ULONG DriverVersion;
   
@@ -1062,6 +1064,10 @@ DokanCreateGlobalDiskDevice(__in PDRIVER_OBJECT DriverObject,
                             __out PDOKAN_GLOBAL *DokanGlobal);
 
 VOID DokanStopDeleteDeviceThread(__in PDOKAN_GLOBAL DokanGlobal);
+
+VOID DokanUnregisterFileSystems(__in PDOKAN_GLOBAL DokanGlobal);
+
+NTSTATUS DokanPrepareForUnload(__in PDOKAN_GLOBAL DokanGlobal);
 
 NTSTATUS
 DokanCreateDiskDevice(__in PDRIVER_OBJECT DriverObject, __in ULONG MountId,

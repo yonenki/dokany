@@ -472,6 +472,16 @@ DokanGlobalUserFsRequest(__in PREQUEST_CONTEXT RequestContext) {
       return STATUS_SUCCESS;
     };
 
+    case FSCTL_PREPARE_UNLOAD: {
+      LUID loadDriverPrivilege =
+          RtlConvertLongToLuid(SE_LOAD_DRIVER_PRIVILEGE);
+      if (!SeSinglePrivilegeCheck(loadDriverPrivilege,
+                                  RequestContext->Irp->RequestorMode)) {
+        return STATUS_PRIVILEGE_NOT_HELD;
+      }
+      return DokanPrepareForUnload(RequestContext->DokanGlobal);
+    };
+
     case FSCTL_MOUNTPOINT_CLEANUP:
       RemoveSessionDevices(RequestContext, GetCurrentSessionId(RequestContext));
       return STATUS_SUCCESS;

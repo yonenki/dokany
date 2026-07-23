@@ -196,6 +196,15 @@ BOOL DOKANAPI DokanSetDebugMode(ULONG Mode);
  */
 BOOL DOKANAPI DokanMountPointsCleanUp();
 
+/**
+ * \brief Prepare the driver for a subsequent service stop.
+ *
+ * This administrative terminal operation rejects new mounts, requires every
+ * mount and delayed device deletion to have completed, stops the cleanup
+ * worker, and unregisters the file-system control devices.
+ */
+BOOL DOKANAPI DokanPrepareDriverUnload();
+
 #ifdef __cplusplus
 }
 #endif

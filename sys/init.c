@@ -347,6 +347,42 @@ VOID DokanStopDeleteDeviceThread(__in PDOKAN_GLOBAL dokanGlobal) {
   dokanGlobal->DeviceDeleteThread = NULL;
 }
 
+VOID DokanUnregisterFileSystems(__in PDOKAN_GLOBAL dokanGlobal) {
+  if (InterlockedExchange(&dokanGlobal->FileSystemsRegistered, FALSE) == FALSE) {
+    return;
+  }
+
+  IoUnregisterFileSystem(dokanGlobal->FsDiskDeviceObject);
+  IoUnregisterFileSystem(dokanGlobal->FsCdDeviceObject);
+}
+
+NTSTATUS DokanPrepareForUnload(__in PDOKAN_GLOBAL dokanGlobal) {
+  NTSTATUS status = STATUS_SUCCESS;
+
+  PAGED_CODE();
+  KeEnterCriticalRegion();
+  ExAcquireResourceExclusiveLite(&dokanGlobal->Resource, TRUE);
+  ExAcquireResourceExclusiveLite(&dokanGlobal->MountPointListLock, TRUE);
+
+  if (!dokanGlobal->UnloadPending &&
+      (!IsListEmpty(&dokanGlobal->MountPointList) ||
+       !IsListEmpty(&dokanGlobal->DeviceDeleteList))) {
+    status = STATUS_DEVICE_BUSY;
+  } else {
+    InterlockedExchange(&dokanGlobal->UnloadPending, TRUE);
+  }
+
+  ExReleaseResourceLite(&dokanGlobal->MountPointListLock);
+  ExReleaseResourceLite(&dokanGlobal->Resource);
+  KeLeaveCriticalRegion();
+
+  if (NT_SUCCESS(status)) {
+    DokanStopDeleteDeviceThread(dokanGlobal);
+    DokanUnregisterFileSystems(dokanGlobal);
+  }
+  return status;
+}
+
 VOID RemoveMountEntry(__in PDOKAN_GLOBAL DokanGlobal,
                       __in PDOKAN_CONTROL DokanControl) {
   ExAcquireResourceExclusiveLite(&DokanGlobal->MountPointListLock, TRUE);
@@ -746,6 +782,8 @@ DokanCreateGlobalDiskDevice(__in PDRIVER_OBJECT DriverObject,
                     FALSE);
   KeInitializeEvent(&dokanGlobal->DeleteDeviceEvent, SynchronizationEvent,
                     FALSE);
+  dokanGlobal->UnloadPending = FALSE;
+  dokanGlobal->FileSystemsRegistered = FALSE;
   DokanStartDeleteDeviceThread(dokanGlobal);
   //
   // Request direct I/O user-buffer access method.
@@ -768,6 +806,7 @@ DokanCreateGlobalDiskDevice(__in PDRIVER_OBJECT DriverObject,
   // Register file systems
   IoRegisterFileSystem(fsDiskDeviceObject);
   IoRegisterFileSystem(fsCdDeviceObject);
+  InterlockedExchange(&dokanGlobal->FileSystemsRegistered, TRUE);
 
   *DokanGlobal = dokanGlobal;
   return STATUS_SUCCESS;

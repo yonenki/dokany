@@ -187,8 +187,7 @@ VOID CleanupGlobalDiskDevice(PDOKAN_GLOBAL dokanGlobal) {
   RtlInitUnicodeString(&symbolicLinkName, symbolicLinkBuf);
   IoDeleteSymbolicLink(&symbolicLinkName);
 
-  IoUnregisterFileSystem(dokanGlobal->FsDiskDeviceObject);
-  IoUnregisterFileSystem(dokanGlobal->FsCdDeviceObject);
+  DokanUnregisterFileSystems(dokanGlobal);
 
   IoDeleteDevice(dokanGlobal->FsDiskDeviceObject);
   IoDeleteDevice(dokanGlobal->FsCdDeviceObject);

@@ -923,6 +923,13 @@ DokanEventStart(__in PREQUEST_CONTEXT RequestContext) {
 
   KeEnterCriticalRegion();
   ExAcquireResourceExclusiveLite(&RequestContext->DokanGlobal->Resource, TRUE);
+  if (RequestContext->DokanGlobal->UnloadPending) {
+    ExReleaseResourceLite(&RequestContext->DokanGlobal->Resource);
+    KeLeaveCriticalRegion();
+    ExFreePool(eventStart);
+    ExFreePool(baseGuidString);
+    return STATUS_DELETE_PENDING;
+  }
 
   DOKAN_CONTROL dokanControl;
   RtlZeroMemory(&dokanControl, sizeof(DOKAN_CONTROL));

@@ -38,3 +38,4 @@ DokanCloseHandle @1
 DokanRequestUnmount @33
 DokanCreateFileSystemEx @34
 DokanGetRuntimeIdentity @35
+DokanPrepareDriverUnload @36

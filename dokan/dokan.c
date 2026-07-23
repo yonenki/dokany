@@ -1592,6 +1592,60 @@ BOOL DOKANAPI DokanMountPointsCleanUp() {
                       0, NULL, 0, &returnedLength);
 }
 
+BOOL DOKANAPI DokanPrepareDriverUnload() {
+  HANDLE processToken = NULL;
+  TOKEN_PRIVILEGES requestedPrivileges = {0};
+  TOKEN_PRIVILEGES previousPrivileges = {0};
+  DWORD previousPrivilegesLength = sizeof(previousPrivileges);
+
+  if (!OpenProcessToken(GetCurrentProcess(),
+                        TOKEN_ADJUST_PRIVILEGES | TOKEN_QUERY,
+                        &processToken)) {
+    return FALSE;
+  }
+  if (!LookupPrivilegeValueW(NULL, SE_LOAD_DRIVER_NAME,
+                             &requestedPrivileges.Privileges[0].Luid)) {
+    DWORD error = GetLastError();
+    CloseHandle(processToken);
+    SetLastError(error);
+    return FALSE;
+  }
+
+  requestedPrivileges.PrivilegeCount = 1;
+  requestedPrivileges.Privileges[0].Attributes = SE_PRIVILEGE_ENABLED;
+  SetLastError(ERROR_SUCCESS);
+  if (!AdjustTokenPrivileges(processToken, FALSE, &requestedPrivileges,
+                             sizeof(previousPrivileges), &previousPrivileges,
+                             &previousPrivilegesLength) ||
+      GetLastError() != ERROR_SUCCESS) {
+    DWORD error = GetLastError();
+    CloseHandle(processToken);
+    SetLastError(error);
+    return FALSE;
+  }
+
+  ULONG returnedLength = 0;
+  BOOL prepared =
+      SendToDevice(DOKAN_GLOBAL_DEVICE_NAME, FSCTL_PREPARE_UNLOAD, NULL, 0,
+                   NULL, 0, &returnedLength);
+  DWORD prepareError = prepared ? ERROR_SUCCESS : GetLastError();
+  BOOL restored = AdjustTokenPrivileges(processToken, FALSE,
+                                        &previousPrivileges, 0, NULL, NULL);
+  DWORD restoreError = restored ? ERROR_SUCCESS : GetLastError();
+  CloseHandle(processToken);
+
+  if (!prepared) {
+    SetLastError(prepareError);
+    return FALSE;
+  }
+  if (!restored) {
+    SetLastError(restoreError);
+    return FALSE;
+  }
+  SetLastError(ERROR_SUCCESS);
+  return TRUE;
+}
+
 BOOL SendToDevice(LPCWSTR DeviceName, DWORD IoControlCode, PVOID InputBuffer,
                   ULONG InputLength, PVOID OutputBuffer, ULONG OutputLength,
                   PULONG ReturnedLength) {
