@@ -57,6 +57,9 @@ Assert-True (
 Assert-True (
     -not $dokanRuntimeSource.Contains('NamespacePathsEqual(expectedVolumeName, finalGuidPath)')) `
     'Mount Manager readiness still compares an internal device GUID with the assigned volume GUID'
+Assert-True (
+    -not $dokanRuntimeSource.Contains('VOLUME_NAME_DOS')) `
+    'Mount Manager readiness still requires an arbitrary DOS alias to equal the requested mount point'
 $solutionSource = Get-Content -Raw -LiteralPath (Join-Path $repositoryRoot 'dokan.sln')
 $projectMatches = [regex]::Matches($solutionSource, '"([^"\r\n]+\.vcxproj)"')
 Assert-True ($projectMatches.Count -gt 0) 'dokan.sln contains no C++ projects'

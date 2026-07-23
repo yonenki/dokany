@@ -775,7 +775,6 @@ static BOOL ProbeMountManagerNamespace(_In_ PDOKAN_INSTANCE DokanInstance) {
   WCHAR mountPoint[MAX_PATH + 2];
   WCHAR volumeName[MAX_PATH];
   WCHAR finalGuidPath[MAX_PATH * 2];
-  WCHAR finalDosPath[MAX_PATH * 2];
 
   wcscpy_s(mountPoint, ARRAYSIZE(mountPoint), DokanInstance->MountPoint);
   size_t mountPointLength = wcslen(mountPoint);
@@ -806,26 +805,11 @@ static BOOL ProbeMountManagerNamespace(_In_ PDOKAN_INSTANCE DokanInstance) {
       mountHandle, finalGuidPath, ARRAYSIZE(finalGuidPath),
       FILE_NAME_NORMALIZED | VOLUME_NAME_GUID);
   DWORD lastError = finalGuidPathLength ? ERROR_SUCCESS : GetLastError();
-  DWORD finalDosPathLength = 0;
-  if (finalGuidPathLength &&
-      finalGuidPathLength < ARRAYSIZE(finalGuidPath) &&
-      NamespacePathsEqual(volumeName, finalGuidPath)) {
-    finalDosPathLength = GetFinalPathNameByHandleW(
-        mountHandle, finalDosPath, ARRAYSIZE(finalDosPath),
-        FILE_NAME_NORMALIZED | VOLUME_NAME_DOS);
-    if (!finalDosPathLength) {
-      lastError = GetLastError();
-    }
-  } else if (finalGuidPathLength) {
-    lastError = ERROR_PATH_NOT_FOUND;
-  }
   CloseHandle(mountHandle);
   if (!finalGuidPathLength ||
       finalGuidPathLength >= ARRAYSIZE(finalGuidPath) ||
-      !finalDosPathLength || finalDosPathLength >= ARRAYSIZE(finalDosPath) ||
-      !NamespacePathsEqual(mountPoint, finalDosPath)) {
-    SetLastError((finalGuidPathLength >= ARRAYSIZE(finalGuidPath) ||
-                  finalDosPathLength >= ARRAYSIZE(finalDosPath))
+      !NamespacePathsEqual(volumeName, finalGuidPath)) {
+    SetLastError(finalGuidPathLength >= ARRAYSIZE(finalGuidPath)
                      ? ERROR_INSUFFICIENT_BUFFER
                      : lastError ? lastError : ERROR_PATH_NOT_FOUND);
     return FALSE;
