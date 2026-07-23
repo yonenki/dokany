@@ -182,7 +182,7 @@ VOID CleanupGlobalDiskDevice(PDOKAN_GLOBAL dokanGlobal) {
   WCHAR symbolicLinkBuf[] = DOKAN_GLOBAL_SYMBOLIC_LINK_NAME;
   UNICODE_STRING symbolicLinkName;
 
-  KeSetEvent(&dokanGlobal->KillDeleteDeviceEvent, 0, FALSE);
+  DokanStopDeleteDeviceThread(dokanGlobal);
 
   RtlInitUnicodeString(&symbolicLinkName, symbolicLinkBuf);
   IoDeleteSymbolicLink(&symbolicLinkName);

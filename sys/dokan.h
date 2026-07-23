@@ -1061,6 +1061,8 @@ NTSTATUS
 DokanCreateGlobalDiskDevice(__in PDRIVER_OBJECT DriverObject,
                             __out PDOKAN_GLOBAL *DokanGlobal);
 
+VOID DokanStopDeleteDeviceThread(__in PDOKAN_GLOBAL DokanGlobal);
+
 NTSTATUS
 DokanCreateDiskDevice(__in PDRIVER_OBJECT DriverObject, __in ULONG MountId,
                       __in PWCHAR MountPoint, __in PWCHAR UNCName,

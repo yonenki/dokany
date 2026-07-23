@@ -51,6 +51,7 @@ try {
 
 $repositoryRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..'))
 $dokanRuntimeSource = Get-Content -Raw -LiteralPath (Join-Path $repositoryRoot 'dokan\dokan.c')
+$driverRuntimeSource = Get-Content -Raw -LiteralPath (Join-Path $repositoryRoot 'sys\dokan.c')
 $driverHeaderSource = Get-Content -Raw -LiteralPath (Join-Path $repositoryRoot 'sys\dokan.h')
 $driverInitializationSource = Get-Content -Raw -LiteralPath (Join-Path $repositoryRoot 'sys\init.c')
 $driverFileSystemControlSource = Get-Content -Raw -LiteralPath (Join-Path $repositoryRoot 'sys\fscontrol.c')
@@ -90,6 +91,20 @@ foreach ($ownedDeviceReference in @(
 Assert-True (
     -not $driverFileSystemControlSource.Contains('ObReferenceObject(volDeviceObject);')) `
     'Volume mounting leaks its owned volume-device reference'
+$stopDeleteThreadPattern =
+    'DokanStopDeleteDeviceThread[\s\S]*?' +
+    'KeSetEvent\(&dokanGlobal->KillDeleteDeviceEvent[\s\S]*?' +
+    'KeWaitForSingleObject\(dokanGlobal->DeviceDeleteThread[\s\S]*?' +
+    'ObDereferenceObject\(dokanGlobal->DeviceDeleteThread\)[\s\S]*?' +
+    'dokanGlobal->DeviceDeleteThread = NULL'
+Assert-True (
+    [regex]::IsMatch($driverInitializationSource, $stopDeleteThreadPattern)) `
+    'Device-deletion worker ownership is not joined and released before global teardown'
+$stopDeleteThreadIndex = $driverRuntimeSource.IndexOf('DokanStopDeleteDeviceThread(dokanGlobal)')
+$deleteGlobalDeviceIndex = $driverRuntimeSource.IndexOf('IoDeleteDevice(dokanGlobal->DeviceObject)')
+Assert-True (
+    $stopDeleteThreadIndex -ge 0 -and $deleteGlobalDeviceIndex -gt $stopDeleteThreadIndex) `
+    'Global teardown deletes the worker context before the device-deletion thread stops'
 $solutionSource = Get-Content -Raw -LiteralPath (Join-Path $repositoryRoot 'dokan.sln')
 $projectMatches = [regex]::Matches($solutionSource, '"([^"\r\n]+\.vcxproj)"')
 Assert-True ($projectMatches.Count -gt 0) 'dokan.sln contains no C++ projects'

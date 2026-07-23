@@ -334,6 +334,19 @@ execute DokanDeviceDeleteDelayedThread
   return STATUS_SUCCESS;
 }
 
+VOID DokanStopDeleteDeviceThread(__in PDOKAN_GLOBAL dokanGlobal) {
+  KeSetEvent(&dokanGlobal->KillDeleteDeviceEvent, IO_NO_INCREMENT, FALSE);
+  if (dokanGlobal->DeviceDeleteThread == NULL) {
+    return;
+  }
+
+  ASSERT(KeGetCurrentIrql() <= APC_LEVEL);
+  KeWaitForSingleObject(dokanGlobal->DeviceDeleteThread, Executive, KernelMode,
+                        FALSE, NULL);
+  ObDereferenceObject(dokanGlobal->DeviceDeleteThread);
+  dokanGlobal->DeviceDeleteThread = NULL;
+}
+
 VOID RemoveMountEntry(__in PDOKAN_GLOBAL DokanGlobal,
                       __in PDOKAN_CONTROL DokanControl) {
   ExAcquireResourceExclusiveLite(&DokanGlobal->MountPointListLock, TRUE);
