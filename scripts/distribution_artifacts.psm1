@@ -30,6 +30,12 @@ function Get-DistributionBuildContext {
 
     $repositoryRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..')).Path
     $profilePath = (Resolve-Path -LiteralPath $DistributionProfile).Path
+    $sourceCommit = (& git -C $repositoryRoot rev-parse HEAD).Trim()
+    if ($LASTEXITCODE -ne 0 -or $sourceCommit -notmatch '^[0-9a-fA-F]{40}$') {
+        throw [System.InvalidOperationException]::new(
+            'Unable to resolve a full Git source commit for distribution generation.')
+    }
+    $sourceCommit = $sourceCommit.ToLowerInvariant()
     $profileJson = Invoke-DistributionProfileTool `
         -RepositoryRoot $repositoryRoot `
         -Arguments @('validate', $profilePath)
@@ -41,10 +47,10 @@ function Get-DistributionBuildContext {
             'Distribution profile validation did not return valid JSON.', $_.Exception)
     }
 
-    $generatedRoot = Join-Path $repositoryRoot "BuildOutput\profiles\$($profile.distributionId)-$($profile.profileHash)"
+    $generatedRoot = Join-Path $repositoryRoot "BuildOutput\profiles\$($profile.distributionId)-$($profile.profileHash)\$sourceCommit"
     Invoke-DistributionProfileTool `
         -RepositoryRoot $repositoryRoot `
-        -Arguments @('generate', $profilePath, $generatedRoot) | Out-Null
+        -Arguments @('generate', $profilePath, $generatedRoot, $sourceCommit) | Out-Null
 
     $runtimeIdentityPath = Join-Path $generatedRoot 'runtime-identity.json'
     if (-not (Test-Path -LiteralPath $runtimeIdentityPath -PathType Leaf)) {
@@ -64,6 +70,7 @@ function Get-DistributionBuildContext {
         RepositoryRoot = $repositoryRoot
         ProfilePath = $profilePath
         Profile = $profile
+        SourceCommit = $sourceCommit
         GeneratedRoot = $generatedRoot
         RuntimeIdentity = $runtimeIdentity
         BinaryBaseName = [string]$runtimeIdentity.family.binaryBaseName

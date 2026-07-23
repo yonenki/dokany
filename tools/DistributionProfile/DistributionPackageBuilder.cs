@@ -1,7 +1,6 @@
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
-using System.Text.RegularExpressions;
 
 namespace Dokany.DistributionProfile;
 
@@ -32,7 +31,7 @@ public sealed record DistributionPackageManifest(
     string SourceCommit,
     SortedDictionary<string, DistributionPackageFile> Files);
 
-public static partial class DistributionPackageBuilder
+public static class DistributionPackageBuilder
 {
     private static readonly JsonSerializerOptions JsonOutput = new()
     {
@@ -119,9 +118,11 @@ public static partial class DistributionPackageBuilder
         {
             throw new DistributionProfileValidationException("Package architecture must be x64 or arm64.");
         }
-        if (!SourceCommitPattern().IsMatch(inputs.SourceCommit))
+        var sourceBuild = SourceBuildIdentity.Parse(inputs.SourceCommit);
+        if (generated.SourceBuild != sourceBuild)
         {
-            throw new DistributionProfileValidationException("Source commit must be a full 40-character Git object ID.");
+            throw new DistributionProfileValidationException(
+                "Generated artifacts do not match the package source build.");
         }
 
         var expectedNames = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
@@ -195,7 +196,4 @@ public static partial class DistributionPackageBuilder
             relativePath,
             new DistributionPackageFile(role, stream.Length, Convert.ToHexString(SHA256.HashData(stream)).ToLowerInvariant()));
     }
-
-    [GeneratedRegex("^[0-9a-fA-F]{40}$", RegexOptions.CultureInvariant)]
-    private static partial Regex SourceCommitPattern();
 }

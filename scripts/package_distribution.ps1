@@ -30,8 +30,7 @@ try {
     $profilePath = $context.ProfilePath
     $profile = $context.Profile
 
-    $headCommit = (& git rev-parse HEAD).Trim()
-    if ($LASTEXITCODE -ne 0) { throw 'Unable to resolve the source commit.' }
+    $headCommit = [string]$context.SourceCommit
     if ([string]::IsNullOrWhiteSpace($SourceCommit)) {
         $SourceCommit = $headCommit
     } elseif ($SourceCommit -ne $headCommit) {

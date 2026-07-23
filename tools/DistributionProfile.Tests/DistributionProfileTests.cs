@@ -7,6 +7,9 @@ namespace Dokany.DistributionProfile.Tests;
 
 public sealed class DistributionProfileTests
 {
+    private static SourceBuildIdentity SourceBuild(char digit = 'a') =>
+        SourceBuildIdentity.Parse(new string(digit, 40));
+
     private static string RepositoryRoot => Path.GetFullPath(
         Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", ".."));
 
@@ -58,7 +61,7 @@ public sealed class DistributionProfileTests
     {
         var profile = DistributionProfileLoader.Load(
             ProfilePath("vendor.json"));
-        var output = DistributionProfileGenerator.Render(profile);
+        var output = DistributionProfileGenerator.Render(profile, SourceBuild());
 
         Assert.Contains("#define DOKAN_DIST_BINARY_BASENAME_W L\"acmefs2\"", output.Header);
         Assert.Contains("#define DOKAN_DIST_GLOBAL_DEVICE_WIN32_W L\"\\\\\\\\.\\\\AcmeFs_2\"", output.Header);
@@ -90,7 +93,7 @@ public sealed class DistributionProfileTests
     {
         var profile = DistributionProfileLoader.Load(
             Path.Combine(RepositoryRoot, "profiles", "upstream.json"));
-        var output = DistributionProfileGenerator.Render(profile);
+        var output = DistributionProfileGenerator.Render(profile, SourceBuild());
 
         Assert.Equal("dokan2", profile.Family.BinaryBaseName);
         Assert.Equal("dokanctl", profile.Family.ControlBaseName);
@@ -105,11 +108,29 @@ public sealed class DistributionProfileTests
     }
 
     [Fact]
+    public void InfPackageIdentityChangesWithTheSourceBuild()
+    {
+        var profile = DistributionProfileLoader.Load(
+            ProfilePath("vendor.json"));
+        var firstCommit = new string('a', 40);
+        var secondCommit = new string('b', 40);
+
+        var first = DistributionProfileGenerator.Render(profile, SourceBuildIdentity.Parse(firstCommit));
+        var second = DistributionProfileGenerator.Render(profile, SourceBuildIdentity.Parse(secondCommit));
+
+        Assert.Contains($"; SourceBuild = {firstCommit}", first.Inf, StringComparison.Ordinal);
+        Assert.Contains($"; SourceBuild = {secondCommit}", second.Inf, StringComparison.Ordinal);
+        Assert.NotEqual(first.Inf, second.Inf);
+        Assert.Equal(first.Header, second.Header);
+        Assert.Equal(first.RuntimeIdentity, second.RuntimeIdentity);
+    }
+
+    [Fact]
     public void ReleasePackageIsImmutableAndHashesTheSelectedFamilyArtifacts()
     {
         var profile = DistributionProfileLoader.Load(
             ProfilePath("vendor.json"));
-        var generated = DistributionProfileGenerator.Render(profile);
+        var generated = DistributionProfileGenerator.Render(profile, SourceBuild());
         using var temporary = new TemporaryDirectory();
         File.WriteAllText(Path.Combine(temporary.Path, "license.lgpl.txt"), "lgpl");
         File.WriteAllText(Path.Combine(temporary.Path, "license.mit.txt"), "mit");
@@ -157,7 +178,7 @@ public sealed class DistributionProfileTests
     {
         var profile = DistributionProfileLoader.Load(
             ProfilePath("vendor.json"));
-        var generated = DistributionProfileGenerator.Render(profile);
+        var generated = DistributionProfileGenerator.Render(profile, SourceBuild('b'));
         using var temporary = new TemporaryDirectory();
         File.WriteAllText(Path.Combine(temporary.Path, "license.lgpl.txt"), "lgpl");
         File.WriteAllText(Path.Combine(temporary.Path, "license.mit.txt"), "mit");

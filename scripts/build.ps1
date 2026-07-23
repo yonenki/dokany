@@ -52,8 +52,14 @@ if ($LASTEXITCODE -ne 0) {
 	throw "Distribution profile validation failed with exit code $LASTEXITCODE."
 }
 $profileInfo = $profileInfoJson | ConvertFrom-Json
-$distributionProfileRoot = Join-Path (Resolve-Path .).Path "BuildOutput\profiles\$($profileInfo.distributionId)-$($profileInfo.profileHash)"
-Exec-External { dotnet run --project .\tools\DistributionProfile\DistributionProfile.csproj -- generate $distributionProfilePath $distributionProfileRoot }
+$repositoryRoot = (Resolve-Path .).Path
+$sourceCommit = (& git -C $repositoryRoot rev-parse HEAD).Trim()
+if ($LASTEXITCODE -ne 0 -or $sourceCommit -notmatch '^[0-9a-fA-F]{40}$') {
+	throw 'Unable to resolve a full Git source commit for distribution generation.'
+}
+$sourceCommit = $sourceCommit.ToLowerInvariant()
+$distributionProfileRoot = Join-Path $repositoryRoot "BuildOutput\profiles\$($profileInfo.distributionId)-$($profileInfo.profileHash)\$sourceCommit"
+Exec-External { dotnet run --project .\tools\DistributionProfile\DistributionProfile.csproj -- generate $distributionProfilePath $distributionProfileRoot $sourceCommit }
 $env:DOKAN_DISTRIBUTION_PROFILE_ROOT = $distributionProfileRoot
 
 $ciBuildArgument = $null

@@ -101,6 +101,7 @@ public sealed record RuntimeFamilyManifest(
     string VolumeBaseGuid);
 
 public sealed record GeneratedDistributionProfile(
+    SourceBuildIdentity SourceBuild,
     string Header,
     string RustConstants,
     string MsBuildProps,
