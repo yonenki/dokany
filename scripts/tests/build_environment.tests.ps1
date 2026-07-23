@@ -54,5 +54,13 @@ $driverToolsets = @($driverProject.SelectNodes(
 Assert-True (
     $driverToolsets.Count -eq 1 -and $driverToolsets[0] -ceq 'WindowsKernelModeDriver10.0') `
     'The driver project does not consistently select the WDK kernel-mode toolset'
+$driverTargetVersions = @($driverProject.SelectNodes(
+        '//msbuild:PropertyGroup[@Label="Configuration"]/msbuild:TargetVersion',
+        $driverNamespaceManager) |
+    ForEach-Object { $_.InnerText } |
+    Select-Object -Unique)
+Assert-True (
+    $driverTargetVersions.Count -eq 1 -and $driverTargetVersions[0] -ceq 'Windows10') `
+    'The driver configurations do not consistently target the supported Windows baseline'
 
 Write-Host 'Build environment tests passed.'
