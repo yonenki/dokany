@@ -609,7 +609,30 @@ DokanDiskUserFsRequest(__in PREQUEST_CONTEXT RequestContext) {
   // TODO(adrienj): Fake the request target the Vcb until we migrate the
   // following function to expected being called to a Dcb.
   requestContext.Vcb = requestContext.Dcb->Vcb;
-  switch (RequestContext->IrpSp->Parameters.FileSystemControl.FsControlCode) {
+
+  ULONG fsControlCode =
+      RequestContext->IrpSp->Parameters.FileSystemControl.FsControlCode;
+  // The event channel is the file system host's private interface: pulling
+  // events, replying to them, resetting pending timeouts and querying access
+  // tokens of pending creates must only come from the process that mounted
+  // the volume. The disk device ACL intentionally allows Everyone, so
+  // without this check any local user could steal events, forge replies or
+  // obtain tokens of privileged processes touching the volume.
+  if ((fsControlCode == FSCTL_EVENT_PROCESS_N_PULL ||
+       fsControlCode == FSCTL_EVENT_WRITE ||
+       fsControlCode == FSCTL_RESET_TIMEOUT ||
+       fsControlCode == FSCTL_GET_ACCESS_TOKEN) &&
+      RequestContext->Dcb->FileSystemProcess != NULL &&
+      IoGetCurrentProcess() != RequestContext->Dcb->FileSystemProcess) {
+    DOKAN_LOG_FINE_IRP(RequestContext,
+                       "Rejecting event channel request 0x%x from foreign "
+                       "process %p (host is %p)",
+                       fsControlCode, IoGetCurrentProcess(),
+                       RequestContext->Dcb->FileSystemProcess);
+    return STATUS_ACCESS_DENIED;
+  }
+
+  switch (fsControlCode) {
     case FSCTL_EVENT_PROCESS_N_PULL:
       return DokanProcessAndPullEvents(&requestContext);
     case FSCTL_EVENT_QUERY_DISPATCH_READY: {

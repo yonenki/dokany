@@ -1125,6 +1125,9 @@ DokanEventStart(__in PREQUEST_CONTEXT RequestContext) {
   DokanLogInfo(&logger, L"Inserted new mount entry.");
 
   dcb->FileLockInUserMode = fileLockUserMode;
+  // Record the file system host process so that the restricted event-channel
+  // FSCTLs can be limited to it.
+  dcb->FileSystemProcess = PsGetCurrentProcess();
   driverInfo->DeviceNumber = RequestContext->DokanGlobal->MountId;
   driverInfo->MountId = RequestContext->DokanGlobal->MountId;
   driverInfo->Status = DOKAN_MOUNTED;
@@ -1387,10 +1390,21 @@ DokanEventWrite(__in PREQUEST_CONTEXT RequestContext) {
     ASSERT(writeIrpSp != NULL);
     ASSERT(eventIrpSp != NULL);
 
+    // Only pending IRP_MJ_WRITE requests carry an event context in
+    // DriverContext[DRIVER_CONTEXT_EVENT]. Any other pending IRP type has
+    // NULL here, so reject foreign serial numbers before dereferencing.
+    if (writeIrpSp->MajorFunction != IRP_MJ_WRITE) {
+      KeReleaseSpinLock(&RequestContext->Dcb->PendingIrp.ListLock, oldIrql);
+      return STATUS_INVALID_PARAMETER;
+    }
+
     eventContext =
         (PEVENT_CONTEXT)
             writeIrp->Tail.Overlay.DriverContext[DRIVER_CONTEXT_EVENT];
-    ASSERT(eventContext != NULL);
+    if (eventContext == NULL) {
+      KeReleaseSpinLock(&RequestContext->Dcb->PendingIrp.ListLock, oldIrql);
+      return STATUS_INVALID_PARAMETER;
+    }
 
     // short of buffer length
     if (eventIrpSp->Parameters.DeviceIoControl.OutputBufferLength <

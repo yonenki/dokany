@@ -303,6 +303,13 @@ typedef struct _DokanDiskControlBlock {
   // for possible values.
   ULONG MountOptions;
 
+  // The process that issued FSCTL_EVENT_START, i.e. the file system host
+  // process. Restricted event-channel FSCTLs (event pull/write, pending
+  // timeout reset, access token query) are only accepted from this process.
+  // No reference is taken; the pointer is used for identity comparison only
+  // and the device is torn down when this process exits.
+  PEPROCESS FileSystemProcess;
+
 } DokanDCB, *PDokanDCB;
 
 #define MAX_PATH 260

@@ -29,12 +29,11 @@ DokanGetAccessToken(__in PREQUEST_CONTEXT RequestContext) {
   PLIST_ENTRY thisEntry, nextEntry, listHead;
   PIRP_ENTRY irpEntry;
   PEVENT_INFORMATION eventInfo = NULL;
-  PACCESS_TOKEN accessToken;
+  PACCESS_TOKEN accessToken = NULL;
   NTSTATUS status = STATUS_INVALID_PARAMETER;
   HANDLE handle;
   BOOLEAN hasLock = FALSE;
   ULONG outBufferLen;
-  PACCESS_STATE accessState = NULL;
 
   __try {
 
@@ -71,34 +70,56 @@ DokanGetAccessToken(__in PREQUEST_CONTEXT RequestContext) {
         continue;
       }
 
-      // this irp must be IRP_MJ_CREATE
-      if (irpEntry->RequestContext.IrpSp->Parameters.Create.SecurityContext) {
-        accessState = irpEntry->RequestContext.IrpSp->Parameters.Create
-                          .SecurityContext->AccessState;
+      // Only IRP_MJ_CREATE carries a valid PIO_SECURITY_CONTEXT here. For
+      // any other pending IRP type the same union storage holds unrelated,
+      // caller-controlled values (e.g. Read/Write ByteOffset) which must
+      // never be dereferenced as pointers.
+      if (irpEntry->RequestContext.IrpSp->MajorFunction != IRP_MJ_CREATE) {
+        status = STATUS_INVALID_PARAMETER;
+        break;
+      }
+
+      PIO_SECURITY_CONTEXT securityContext =
+          irpEntry->RequestContext.IrpSp->Parameters.Create.SecurityContext;
+      if (securityContext != NULL) {
+        PACCESS_STATE accessState = securityContext->AccessState;
+        if (accessState != NULL) {
+          accessToken =
+              SeQuerySubjectContextToken(&accessState->SubjectSecurityContext);
+        }
+      }
+      if (accessToken != NULL) {
+        // Pin the token while the pending IRP is still protected by the list
+        // lock so that it stays valid after the lock is released below.
+        // Without this, the IRP could complete and free the access state in
+        // between.
+        ObReferenceObject(accessToken);
+      } else {
+        status = STATUS_INVALID_PARAMETER;
       }
       break;
     }
     KeReleaseSpinLock(&RequestContext->Dcb->PendingIrp.ListLock, oldIrql);
     hasLock = FALSE;
 
-    if (accessState == NULL) {
-      DOKAN_LOG_FINE_IRP(RequestContext, "Can't find pending Irp: %ld", eventInfo->SerialNumber);
+    if (accessToken == NULL) {
+      DOKAN_LOG_FINE_IRP(RequestContext, "Can't find pending create Irp: %ld",
+                         eventInfo->SerialNumber);
       __leave;
     }
 
-    accessToken =
-        SeQuerySubjectContextToken(&accessState->SubjectSecurityContext);
-    if (accessToken == NULL) {
-      DOKAN_LOG_FINE_IRP(RequestContext, "AccessToken == NULL");
-      __leave;
-    }
     // NOTE: Accessing *SeTokenObjectType while acquring sping lock causes
     // BSOD on Windows XP.
-    status = ObOpenObjectByPointer(accessToken, 0, NULL, GENERIC_ALL,
-                                   *SeTokenObjectType, KernelMode, &handle);
+    // The granted access is limited to what a file system host needs to
+    // inspect and impersonate the requestor, instead of GENERIC_ALL.
+    status = ObOpenObjectByPointer(
+        accessToken, 0, NULL, TOKEN_DUPLICATE | TOKEN_QUERY | TOKEN_IMPERSONATE,
+        *SeTokenObjectType, KernelMode, &handle);
+    ObDereferenceObject(accessToken);
     if (!NT_SUCCESS(status)) {
-      DOKAN_LOG_FINE_IRP(RequestContext, "ObOpenObjectByPointer failed: 0x%x %s", status,
-                       DokanGetNTSTATUSStr(status));
+      DOKAN_LOG_FINE_IRP(RequestContext,
+                         "ObOpenObjectByPointer failed: 0x%x %s", status,
+                         DokanGetNTSTATUSStr(status));
       __leave;
     }
 
