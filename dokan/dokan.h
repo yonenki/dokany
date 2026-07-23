@@ -59,6 +59,8 @@ extern "C" {
 #define DOKAN_VERSION DOKAN_DIST_LIBRARY_VERSION
 /** Minimum Dokan version (ver 2.0.0) accepted. */
 #define DOKAN_MINIMUM_COMPATIBLE_VERSION 200
+/** \ref DOKAN_OPTIONS.ThreadCount is only read when Version is at least this value. */
+#define DOKAN_THREADCOUNT_SUPPORTED_VERSION 232
 /** Driver file name including the DOKAN_MAJOR_API_VERSION */
 #define DOKAN_DRIVER_NAME DOKAN_DIST_BINARY_BASENAME_W L".sys"
 /** Network provider name including the DOKAN_MAJOR_API_VERSION */
@@ -172,6 +174,16 @@ typedef struct _DOKAN_OPTIONS {
   ULONG VolumeSecurityDescriptorLength;
   /** Optional Volume Security descriptor. See <a href="https://docs.microsoft.com/en-us/windows/win32/api/securitybaseapi/nf-securitybaseapi-initializesecuritydescriptor">InitializeSecurityDescriptor</a> */
   CHAR VolumeSecurityDescriptor[VOLUME_SECURITY_DESCRIPTOR_MAX_SIZE];
+  /**
+   * Number of event pull threads used for this mount.
+   * 0 (default) keeps the automatic behavior, which uses one pull thread per
+   * available CPU clamped between 2 and 16. Setting this to 1 disables IPC
+   * batching, like \ref DOKAN_OPTIONS.SingleThread does.
+   * Products mounting many volumes can lower their per-mount thread cost by
+   * setting a small value here. Only read when \ref Version is at least
+   * \ref DOKAN_THREADCOUNT_SUPPORTED_VERSION.
+   */
+  USHORT ThreadCount;
 } DOKAN_OPTIONS, *PDOKAN_OPTIONS;
 
 /**

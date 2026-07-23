@@ -183,6 +183,7 @@ VOID DokanCleanupGlobalDiskDevice(PDOKAN_GLOBAL dokanGlobal) {
   UNICODE_STRING symbolicLinkName;
 
   DokanStopDeleteDeviceThread(dokanGlobal);
+  DokanStopTimeoutScanThread(dokanGlobal);
 
   RtlInitUnicodeString(&symbolicLinkName, symbolicLinkBuf);
   IoDeleteSymbolicLink(&symbolicLinkName);

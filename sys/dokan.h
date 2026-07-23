@@ -186,6 +186,15 @@ typedef struct _DOKAN_GLOBAL {
   volatile LONG GlobalControlHandleCount;
   volatile LONG GlobalControlTeardownClaimed;
 
+  // Global IRP timeout scanner state. A single system thread periodically
+  // runs ReleaseTimeoutPendingIrp for every mounted DCB, instead of having
+  // one thread per mount. AllDcbList is protected by Resource (shared while
+  // scanning, exclusive while inserting/removing).
+  LIST_ENTRY AllDcbList;
+  KEVENT TimeoutScanKillEvent;
+  KEVENT TimeoutScanForceEvent;
+  PKTHREAD TimeoutScanThread;
+
   ULONG DriverVersion;
   
   // We try to avoid having race condition when switching the AutoMount flag of
@@ -236,13 +245,12 @@ typedef struct _DokanDiskControlBlock {
   UNICODE_STRING MountedDeviceInterfaceName;
   UNICODE_STRING DiskDeviceInterfaceName;
 
-  // When timeout is occuerd, KillEvent is triggered.
-  KEVENT KillEvent;
-  KEVENT ForceTimeoutEvent;
+  // Link into DOKAN_GLOBAL's AllDcbList used by the global timeout scanner.
+  // Inserted when the volume mounts, removed before the DCB is deleted.
+  LIST_ENTRY AllDcbListEntry;
   KEVENT ReleaseEvent;
 
-  // the thread to deal with timeout
-  PKTHREAD TimeoutThread;
+  // the thread to deal with event notification
   PKTHREAD EventNotificationThread;
 
   // When UseAltStream is 1, use Alternate stream
@@ -1165,9 +1173,9 @@ NTSTATUS
 DokanFreeCCB(__in PREQUEST_CONTEXT RequestContext, __in PDokanCCB Ccb);
 
 NTSTATUS
-DokanStartCheckThread(__in PDokanDCB Dcb);
+DokanStartTimeoutScanThread(__in PDOKAN_GLOBAL DokanGlobal);
 
-VOID DokanStopCheckThread(__in PDokanDCB Dcb);
+VOID DokanStopTimeoutScanThread(__in PDOKAN_GLOBAL DokanGlobal);
 
 // Whether the Ccb is part of the given mount Dcb.
 BOOLEAN IsCcbAndDcbSameMount(__in PREQUEST_CONTEXT RequestContext, __in PDokanCCB Ccb, __in PDokanDCB Dcb);

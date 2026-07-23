@@ -73,7 +73,13 @@ static VOID DokanPrintToSysLog(__in PDRIVER_OBJECT DriverObject,
   UCHAR packetSize = 0;
 
   __try {
-  	if (KeGetCurrentIrql() > PASSIVE_LEVEL) {
+    if (DriverObject == NULL) {
+      // Some callers (e.g. timeout-triggered unmount helpers) have no driver
+      // object to attribute the event to; skip the event log write rather
+      // than passing NULL to IoAllocateErrorLogEntry.
+      __leave;
+    }
+    if (KeGetCurrentIrql() > PASSIVE_LEVEL) {
       DOKAN_LOG_("Event viewer logging called at a too high IRQL\n");
       __leave;
     }

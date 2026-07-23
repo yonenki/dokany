@@ -1079,7 +1079,19 @@ static int DokanCreateFileSystemInternal(
     DbgPrintW(L"Dokan Error: GetProcessAffinityMask failed with Error %d\n",
               GetLastError());
   }
-  if (DokanOptions->SingleThread) {
+  // An explicit ThreadCount request (Version-gated) wins over the automatic
+  // CPU-based behavior. A single pull thread disables IPC batching for the
+  // same reason SingleThread does.
+  USHORT requestedThreadCount =
+      DokanOptions->Version >= DOKAN_THREADCOUNT_SUPPORTED_VERSION
+          ? DokanOptions->ThreadCount
+          : 0;
+  if (requestedThreadCount != 0) {
+    mainPullThreadCount = requestedThreadCount;
+    if (mainPullThreadCount == 1) {
+      DokanOptions->Options &= ~DOKAN_OPTION_ALLOW_IPC_BATCHING;
+    }
+  } else if (DokanOptions->SingleThread) {
     mainPullThreadCount = 1; // Really not recommanded
     DokanOptions->Options &= ~DOKAN_OPTION_ALLOW_IPC_BATCHING;
   } else if (mainPullThreadCount < DOKAN_MAIN_PULL_THREAD_COUNT_MIN) {

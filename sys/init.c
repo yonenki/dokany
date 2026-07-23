@@ -405,6 +405,7 @@ NTSTATUS DokanPrepareForUnload(__in PDOKAN_GLOBAL dokanGlobal) {
 
   if (NT_SUCCESS(status)) {
     DokanStopDeleteDeviceThread(dokanGlobal);
+    DokanStopTimeoutScanThread(dokanGlobal);
     DokanUnregisterFileSystems(dokanGlobal);
   }
   return status;
@@ -809,11 +810,17 @@ DokanCreateGlobalDiskDevice(__in PDRIVER_OBJECT DriverObject,
                     FALSE);
   KeInitializeEvent(&dokanGlobal->DeleteDeviceEvent, SynchronizationEvent,
                     FALSE);
+  InitializeListHead(&dokanGlobal->AllDcbList);
+  KeInitializeEvent(&dokanGlobal->TimeoutScanKillEvent, NotificationEvent,
+                    FALSE);
+  KeInitializeEvent(&dokanGlobal->TimeoutScanForceEvent, NotificationEvent,
+                    FALSE);
   dokanGlobal->UnloadPending = FALSE;
   dokanGlobal->FileSystemsRegistered = FALSE;
   dokanGlobal->GlobalControlHandleCount = 0;
   dokanGlobal->GlobalControlTeardownClaimed = FALSE;
   DokanStartDeleteDeviceThread(dokanGlobal);
+  DokanStartTimeoutScanThread(dokanGlobal);
   //
   // Request direct I/O user-buffer access method.
   //
@@ -1134,8 +1141,7 @@ DokanCreateDiskDevice(__in PDRIVER_OBJECT DriverObject, __in ULONG MountId,
     dcb->DeviceType = FILE_DEVICE_DISK;
     dcb->DeviceCharacteristics = DeviceCharacteristics;
     dcb->SessionId = SessionId;
-    KeInitializeEvent(&dcb->KillEvent, NotificationEvent, FALSE);
-    KeInitializeEvent(&dcb->ForceTimeoutEvent, NotificationEvent, FALSE);
+    InitializeListHead(&dcb->AllDcbListEntry);
     IoInitializeRemoveLock(&dcb->RemoveLock, TAG, 1, 100);
     //
     // Establish user-buffer access method.
@@ -1316,6 +1322,15 @@ VOID DokanDeleteDeviceObject(__in_opt PREQUEST_CONTEXT RequestContext,
     DokanLogInfo(&logger, L"Deleting volume device object.");
     volumeDeviceObject = vcb->DeviceObject;
   }
+
+  // Detach the DCB from the global timeout scanner before queueing it for
+  // deletion.
+  ExAcquireResourceExclusiveLite(&Dcb->Global->Resource, TRUE);
+  if (!IsListEmpty(&Dcb->AllDcbListEntry)) {
+    RemoveEntryList(&Dcb->AllDcbListEntry);
+    InitializeListHead(&Dcb->AllDcbListEntry);
+  }
+  ExReleaseResourceLite(&Dcb->Global->Resource);
 
   InsertDcbToDelete(Dcb, volumeDeviceObject, FALSE);
 

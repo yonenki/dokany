@@ -761,7 +761,12 @@ NTSTATUS SendDirectoryFsctl(PREQUEST_CONTEXT RequestContext,
   PUNICODE_STRING directoryStr = NULL;
   NTSTATUS status = STATUS_SUCCESS;
   PIRP topLevelIrp = NULL;
-  DOKAN_INIT_LOGGER(logger, RequestContext->DeviceObject->DriverObject,
+  // RequestContext may be NULL when this is called from a timeout-triggered
+  // unmount. The logger tolerates a NULL driver object (the event log write
+  // is skipped in that case).
+  DOKAN_INIT_LOGGER(logger,
+                    RequestContext ? RequestContext->DeviceObject->DriverObject
+                                   : NULL,
                     IRP_MJ_FILE_SYSTEM_CONTROL);
 
   __try {
@@ -775,7 +780,7 @@ NTSTATUS SendDirectoryFsctl(PREQUEST_CONTEXT RequestContext,
       __leave;
     }
 
-    if (RequestContext->IsTopLevelIrp) {
+    if (RequestContext != NULL && RequestContext->IsTopLevelIrp) {
       topLevelIrp = IoGetTopLevelIrp();
       IoSetTopLevelIrp(NULL);
     }
@@ -985,7 +990,11 @@ NTSTATUS DokanMountVolume(__in PREQUEST_CONTEXT RequestContext) {
   ExReleaseResourceLite(&dcb->Resource);
 
   // Start check thread
-  DokanStartCheckThread(dcb);
+  // Register the DCB with the global IRP timeout scanner now that the
+  // volume exists (the scanner dereferences Dcb->Vcb).
+  ExAcquireResourceExclusiveLite(&dcb->Global->Resource, TRUE);
+  InsertTailList(&dcb->Global->AllDcbList, &dcb->AllDcbListEntry);
+  ExReleaseResourceLite(&dcb->Global->Resource);
 
   BOOLEAN isDriveLetter = IsMountPointDriveLetter(dcb->MountPoint);
   // Create mount point for the volume

@@ -47,7 +47,7 @@ VOID DokanCreateIrpCancelRoutine(_Inout_ PDEVICE_OBJECT DeviceObject,
     irpEntry->RequestContext.ForcedCanceled = TRUE;
     PDokanVCB vcb = DeviceObject->DeviceExtension;
     PDokanDCB dcb = vcb->Dcb;
-    KeSetEvent(&dcb->ForceTimeoutEvent, 0, FALSE);
+    KeSetEvent(&dcb->Global->TimeoutScanForceEvent, 0, FALSE);
   }
 }
 
@@ -371,7 +371,7 @@ VOID DokanRegisterAsyncCreateFailure(__in PREQUEST_CONTEXT RequestContext,
   RegisterPendingIrpMain(RequestContext, /*EventContext=*/NULL,
                          &RequestContext->Dcb->PendingIrp,
                          /*CheckMount=*/TRUE, /*CurrentStatus=*/Status);
-  KeSetEvent(&RequestContext->Dcb->ForceTimeoutEvent, 0, FALSE);
+  KeSetEvent(&RequestContext->Dcb->Global->TimeoutScanForceEvent, 0, FALSE);
 }
 
 void DokanDispatchCompletion(__in PDEVICE_OBJECT DeviceObject,
