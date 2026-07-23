@@ -11,6 +11,11 @@ param (
 
 $ErrorActionPreference = "Stop"
 
+# Keep machine-local first-run state and telemetry banners out of the
+# machine-readable distribution profile output consumed below.
+$env:DOTNET_NOLOGO = '1'
+$env:DOTNET_CLI_TELEMETRY_OPTOUT = '1'
+
 Add-VisualStudio-Path
 
 if ([string]::IsNullOrWhiteSpace($PlatformToolset)) {
