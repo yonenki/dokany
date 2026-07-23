@@ -1,20 +1,49 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ImportGroup Label="PropertySheets" />
+  <PropertyGroup>
+    <DokanDistributionProfileRoot Condition="'$(DokanDistributionProfileRoot)' == '' and '$(DOKAN_DISTRIBUTION_PROFILE_ROOT)' != ''">$(DOKAN_DISTRIBUTION_PROFILE_ROOT)</DokanDistributionProfileRoot>
+    <DokanDistributionProfileProps>$(DokanDistributionProfileRoot)\Dokan.DistributionProfile.props</DokanDistributionProfileProps>
+  </PropertyGroup>
+  <Import Project="$(DokanDistributionProfileProps)" Condition="Exists('$(DokanDistributionProfileProps)')" />
   <PropertyGroup Label="UserMacros">
-    <DOKANAPIVersion>2</DOKANAPIVersion>
-    <DOKANVersion>2.3.1</DOKANVersion>
+    <DokanDistributionProfileHeader>$(DokanDistributionProfileRoot)\dokan_distribution_profile.h</DokanDistributionProfileHeader>
   </PropertyGroup>
   <PropertyGroup />
-  <ItemDefinitionGroup />
+  <ItemDefinitionGroup>
+    <ClCompile>
+      <AdditionalIncludeDirectories>$(DokanDistributionProfileRoot);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ResourceCompile>
+      <AdditionalIncludeDirectories>$(DokanDistributionProfileRoot);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ResourceCompile>
+  </ItemDefinitionGroup>
   <ItemGroup>
+    <BuildMacro Include="DokanDistributionId">
+      <Value>$(DokanDistributionId)</Value>
+      <EnvironmentVariable>true</EnvironmentVariable>
+    </BuildMacro>
+    <BuildMacro Include="DokanDistributionProfileHash">
+      <Value>$(DokanDistributionProfileHash)</Value>
+      <EnvironmentVariable>true</EnvironmentVariable>
+    </BuildMacro>
+    <BuildMacro Include="DokanBinaryBaseName">
+      <Value>$(DokanBinaryBaseName)</Value>
+      <EnvironmentVariable>true</EnvironmentVariable>
+    </BuildMacro>
     <BuildMacro Include="DOKANAPIVersion">
       <Value>$(DOKANAPIVersion)</Value>
       <EnvironmentVariable>true</EnvironmentVariable>
     </BuildMacro>
-      <BuildMacro Include="DOKANVersion">
+    <BuildMacro Include="DOKANVersion">
       <Value>$(DOKANVersion)</Value>
       <EnvironmentVariable>true</EnvironmentVariable>
     </BuildMacro>
   </ItemGroup>
+  <Target Name="ValidateDokanDistributionProfile" BeforeTargets="PrepareForBuild">
+    <Error Condition="'$(DokanDistributionProfileRoot)' == ''" Text="DokanDistributionProfileRoot is required. Build through scripts/build.ps1 -DistributionProfile &lt;profile.json&gt;." />
+    <Error Condition="!Exists('$(DokanDistributionProfileProps)')" Text="Generated distribution props are missing: $(DokanDistributionProfileProps)" />
+    <Error Condition="!Exists('$(DokanDistributionProfileHeader)')" Text="Generated distribution header is missing: $(DokanDistributionProfileHeader)" />
+    <Error Condition="'$(DokanBinaryBaseName)' == '' or '$(DokanDistributionProfileHash)' == ''" Text="Generated distribution profile is incomplete." />
+  </Target>
 </Project>

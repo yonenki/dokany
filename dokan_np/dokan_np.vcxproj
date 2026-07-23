@@ -164,32 +164,32 @@
     <CodeAnalysisRuleAssemblies Condition="'$(Configuration)|$(Platform)'=='Release|x64'" />
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
-    <TargetName>dokannp$(DOKANAPIVersion)</TargetName>
+    <TargetName>$(DokanNetworkProviderBaseName)</TargetName>
     <RunCodeAnalysis>true</RunCodeAnalysis>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|ARM'">
-    <TargetName>dokannp$(DOKANAPIVersion)</TargetName>
+    <TargetName>$(DokanNetworkProviderBaseName)</TargetName>
     <RunCodeAnalysis>true</RunCodeAnalysis>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|ARM64'">
-    <TargetName>dokannp$(DOKANAPIVersion)</TargetName>
+    <TargetName>$(DokanNetworkProviderBaseName)</TargetName>
     <RunCodeAnalysis>true</RunCodeAnalysis>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <TargetName>dokannp$(DOKANAPIVersion)</TargetName>
+    <TargetName>$(DokanNetworkProviderBaseName)</TargetName>
     <RunCodeAnalysis>true</RunCodeAnalysis>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
-    <TargetName>dokannp$(DOKANAPIVersion)</TargetName>
+    <TargetName>$(DokanNetworkProviderBaseName)</TargetName>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|ARM'">
-    <TargetName>dokannp$(DOKANAPIVersion)</TargetName>
+    <TargetName>$(DokanNetworkProviderBaseName)</TargetName>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|ARM64'">
-    <TargetName>dokannp$(DOKANAPIVersion)</TargetName>
+    <TargetName>$(DokanNetworkProviderBaseName)</TargetName>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-    <TargetName>dokannp$(DOKANAPIVersion)</TargetName>
+    <TargetName>$(DokanNetworkProviderBaseName)</TargetName>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>

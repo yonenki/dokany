@@ -3,6 +3,19 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](http://keepachangelog.com/) and this project adheres to [Semantic Versioning](http://semver.org/).
 
+## [Unreleased]
+
+### Added
+- Library - Add `DokanRequestUnmount` to request a non-blocking unmount of an exact filesystem instance.
+- Library - Add `DokanCreateFileSystemEx` with cooperative startup cancellation.
+- Kernel/Library - Add negotiated dispatch-ready and startup-cancellation protocol capabilities without changing legacy protocol structures.
+
+### Fixed
+- Library - Make `DokanCloseHandle` unmount its exact filesystem instance instead of looking it up by mount point.
+- Kernel/Library - Wait for an event dispatcher to reach the driver before reporting a new filesystem as ready.
+- Kernel - Propagate Mount Manager arrival and directory mount-point notification failures instead of reporting a successful mount.
+- Library - Verify the exact volume and DOS namespace mapping before cancellable Mount Manager startup succeeds.
+
 ## [2.3.1.1000] - 2025-09-28
 
 ### Changed

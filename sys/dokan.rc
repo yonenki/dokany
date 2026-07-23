@@ -6,6 +6,7 @@
 // Generated from the TEXTINCLUDE 2 resource.
 //
 #include "winres.h"
+#include "dokan_distribution_profile.h"
 
 /////////////////////////////////////////////////////////////////////////////
 #undef APSTUDIO_READONLY_SYMBOLS
@@ -16,8 +17,8 @@
 //
 
 VS_VERSION_INFO VERSIONINFO
- FILEVERSION 2,3,1,1000
- PRODUCTVERSION 2,3,1,1000
+ FILEVERSION DOKAN_DIST_PRODUCT_VERSION_COMMA
+ PRODUCTVERSION DOKAN_DIST_PRODUCT_VERSION_COMMA
  FILEFLAGSMASK 0x3fL
 #ifdef _DEBUG
  FILEFLAGS 0x1L
@@ -32,14 +33,14 @@ BEGIN
     BEGIN
         BLOCK "000004e3"
         BEGIN
-            VALUE "CompanyName", "Dokan Project"
-            VALUE "FileDescription", "Dokan Driver"
-            VALUE "FileVersion", "2.3.1.1000"
-            VALUE "InternalName", "dokan.sys"
+            VALUE "CompanyName", DOKAN_DIST_COMPANY_NAME_W
+            VALUE "FileDescription", DOKAN_DIST_DISPLAY_NAME_W L" Driver"
+            VALUE "FileVersion", DOKAN_DIST_PRODUCT_VERSION_W
+            VALUE "InternalName", DOKAN_DIST_DRIVER_FILENAME_W
             VALUE "LegalCopyright", "Copyright (C) 2021"
-            VALUE "OriginalFilename", "dokan.sys"
-            VALUE "ProductName", "Dokan"
-            VALUE "ProductVersion", "2.3.1.1000"
+            VALUE "OriginalFilename", DOKAN_DIST_DRIVER_FILENAME_W
+            VALUE "ProductName", DOKAN_DIST_DISPLAY_NAME_W
+            VALUE "ProductVersion", DOKAN_DIST_PRODUCT_VERSION_W
         END
     END
     BLOCK "VarFileInfo"

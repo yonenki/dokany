@@ -60,48 +60,31 @@ extern DokanPtr_FsRtlAreThereWaitingFileLocks
 #define DOKAN_DISK_DEVICE_NAME L"\\Device\\Volume"
 #define DOKAN_SYMBOLIC_LINK_NAME L"\\DosDevices\\Global\\Volume"
 
-#ifndef DOKAN_DEVICE_PREFIX_NAME
-#define DOKAN_DEVICE_PREFIX_NAME L"Dokan"
-#endif
 #ifndef DOKAN_GLOBAL_DEVICE_NAME
-#define DOKAN_GLOBAL_DEVICE_NAME \
-  L"\\Device\\" DOKAN_DEVICE_PREFIX_NAME L"_" DOKAN_MAJOR_API_VERSION
+#define DOKAN_GLOBAL_DEVICE_NAME DOKAN_DIST_GLOBAL_DEVICE_NT_W
 #endif
 #ifndef DOKAN_GLOBAL_SYMBOLIC_LINK_NAME
-#define DOKAN_GLOBAL_SYMBOLIC_LINK_NAME                                        \
-  L"\\DosDevices\\Global\\" \
-    DOKAN_DEVICE_PREFIX_NAME L"_" DOKAN_MAJOR_API_VERSION
+#define DOKAN_GLOBAL_SYMBOLIC_LINK_NAME DOKAN_DIST_GLOBAL_SYMBOLIC_LINK_W
 #endif
 #ifndef DOKAN_GLOBAL_FS_DISK_DEVICE_NAME
-#define DOKAN_GLOBAL_FS_DISK_DEVICE_NAME                                       \
-  L"\\Device\\" DOKAN_DEVICE_PREFIX_NAME L"Fs" DOKAN_MAJOR_API_VERSION
+#define DOKAN_GLOBAL_FS_DISK_DEVICE_NAME DOKAN_DIST_FS_DISK_DEVICE_W
 #endif
 #ifndef DOKAN_GLOBAL_FS_CD_DEVICE_NAME
-#define DOKAN_GLOBAL_FS_CD_DEVICE_NAME                                         \
-  L"\\Device\\" DOKAN_DEVICE_PREFIX_NAME L"CdFs" DOKAN_MAJOR_API_VERSION
+#define DOKAN_GLOBAL_FS_CD_DEVICE_NAME DOKAN_DIST_FS_CD_DEVICE_W
 #endif
 #ifndef DOKAN_NET_DEVICE_NAME
-#define DOKAN_NET_DEVICE_NAME                                                  \
-  L"\\Device\\" DOKAN_DEVICE_PREFIX_NAME L"Redirector" DOKAN_MAJOR_API_VERSION
+#define DOKAN_NET_DEVICE_NAME DOKAN_DIST_REDIRECTOR_DEVICE_W
 #endif
 #ifndef DOKAN_NET_SYMBOLIC_LINK_NAME
-#define DOKAN_NET_SYMBOLIC_LINK_NAME                                           \
-  L"\\DosDevices\\Global\\" \
-    DOKAN_DEVICE_PREFIX_NAME L"Redirector" DOKAN_MAJOR_API_VERSION
+#define DOKAN_NET_SYMBOLIC_LINK_NAME DOKAN_DIST_REDIRECTOR_SYMBOLIC_LINK_W
 #endif
 
 #ifndef VOLUME_LABEL
-#define VOLUME_LABEL L"DOKAN"
+#define VOLUME_LABEL DOKAN_DIST_VOLUME_LABEL_W
 #endif
 
-// {D6CC17C5-1734-4085-BCE7-964F1E9F5DE9}
 #ifndef DOKAN_BASE_GUID
-#define DOKAN_BASE_GUID                                                        \
-  {                                                                            \
-    0xd6cc17c5, 0x1734, 0x4085, {                                              \
-      0xbc, 0xe7, 0x96, 0x4f, 0x1e, 0x9f, 0x5d, 0xe9                           \
-    }                                                                          \
-  }
+#define DOKAN_BASE_GUID DOKAN_DIST_VOLUME_BASE_GUID_INITIALIZER
 #endif
 
 #define TAG (ULONG)'AKOD'
@@ -197,6 +180,11 @@ typedef struct _DOKAN_GLOBAL {
 
   LIST_ENTRY DeviceDeleteList;
   KEVENT KillDeleteDeviceEvent;
+  KEVENT DeleteDeviceEvent;
+  volatile LONG UnloadPending;
+  volatile LONG FileSystemsRegistered;
+  volatile LONG GlobalControlHandleCount;
+  volatile LONG GlobalControlTeardownClaimed;
 
   ULONG DriverVersion;
   
@@ -284,12 +272,22 @@ typedef struct _DokanDiskControlBlock {
   // point yet.
   BOOLEAN MountPointDetermined;
 
+  // First Mount Manager failure observed while the volume is starting and the
+  // corresponding DOKAN_DRIVER_INFO_* flags returned to user mode.
+  NTSTATUS MountManagerStatus;
+  ULONG MountManagerFailureFlags;
+  PKEVENT MountCancellationEvent;
+
   // Whether to dispatch the driver logs to userland.
   BOOLEAN DispatchDriverLogs;
   // Allow I/O requests to be conveyed to user mode in batches, rather than
   // strictly one for each DeviceIoControl that the DLL issues to fetch a
   // request.
   BOOLEAN AllowIpcBatching;
+
+  // Sticky state set when the first user-mode dispatcher reaches the event
+  // pull path. Access this through interlocked operations.
+  volatile LONG DispatchReady;
 
   // How often to garbage-collect FCBs. If this is 0, we use the historical
   // default behavior of freeing them on the spot and in the current context
@@ -806,6 +804,9 @@ typedef struct _REQUEST_CONTEXT {
 
   // Whether if we are the top-level IRP.
   BOOLEAN IsTopLevelIrp;
+
+  // The final prepared close owns global control-device teardown.
+  BOOLEAN DeleteGlobalDevicesAfterDispatch;
 } REQUEST_CONTEXT, *PREQUEST_CONTEXT;
 
 // IRP list which has pending status
@@ -825,7 +826,6 @@ typedef struct _DEVICE_ENTRY {
   PDEVICE_OBJECT DiskDeviceObject;
   PDEVICE_OBJECT VolumeDeviceObject;
   ULONG SessionId;
-  ULONG Counter;
   UNICODE_STRING MountPoint;
 } DEVICE_ENTRY, *PDEVICE_ENTRY;
 
@@ -988,6 +988,7 @@ NTSTATUS
 DokanExceptionHandler(__in PDEVICE_OBJECT DeviceObject, __in PIRP Irp,
                       __in NTSTATUS ExceptionCode);
 
+_IRQL_requires_(PASSIVE_LEVEL)
 NTSTATUS
 DokanEventStart(__in PREQUEST_CONTEXT RequestContext);
 
@@ -1067,6 +1068,18 @@ DokanNoOpAcquire(__in PVOID Fcb, __in BOOLEAN Wait);
 NTSTATUS
 DokanCreateGlobalDiskDevice(__in PDRIVER_OBJECT DriverObject,
                             __out PDOKAN_GLOBAL *DokanGlobal);
+
+VOID DokanStopDeleteDeviceThread(__in PDOKAN_GLOBAL DokanGlobal);
+
+VOID DokanUnregisterFileSystems(__in PDOKAN_GLOBAL DokanGlobal);
+
+NTSTATUS DokanRegisterGlobalControlHandle(__in PDOKAN_GLOBAL DokanGlobal);
+
+BOOLEAN DokanReleaseGlobalControlHandle(__in PDOKAN_GLOBAL DokanGlobal);
+
+VOID DokanCleanupGlobalDiskDevice(__in PDOKAN_GLOBAL DokanGlobal);
+
+NTSTATUS DokanPrepareForUnload(__in PDOKAN_GLOBAL DokanGlobal);
 
 NTSTATUS
 DokanCreateDiskDevice(__in PDRIVER_OBJECT DriverObject, __in ULONG MountId,

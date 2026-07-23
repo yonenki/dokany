@@ -395,6 +395,11 @@ Return Value:
   PAGED_CODE();
 
   __try {
+    if (RequestContext->DokanGlobal != NULL) {
+      status = DokanRegisterGlobalControlHandle(RequestContext->DokanGlobal);
+      __leave;
+    }
+
     fileObject = RequestContext->IrpSp->FileObject;
     if (fileObject == NULL) {
       status = STATUS_INVALID_PARAMETER;

@@ -30,9 +30,9 @@ with this program. If not, see <http://www.gnu.org/licenses/>.
 extern "C" {
 #endif
 
-#define DOKAN_GLOBAL_DEVICE_NAME L"\\\\.\\Dokan_" DOKAN_MAJOR_API_VERSION
+#define DOKAN_GLOBAL_DEVICE_NAME DOKAN_DIST_GLOBAL_DEVICE_WIN32_W
 
-#define DOKAN_DRIVER_SERVICE L"Dokan" DOKAN_MAJOR_API_VERSION
+#define DOKAN_DRIVER_SERVICE DOKAN_DIST_DRIVER_SERVICE_W
 
 #define DOKAN_SERVICE_START 1
 #define DOKAN_SERVICE_STOP 2
@@ -195,6 +195,15 @@ BOOL DOKANAPI DokanSetDebugMode(ULONG Mode);
  * to remove them from the system for being again available for a new mount.
  */
 BOOL DOKANAPI DokanMountPointsCleanUp();
+
+/**
+ * \brief Prepare the driver for a subsequent service stop.
+ *
+ * This administrative terminal operation rejects new mounts, requires every
+ * mount and delayed device deletion to have completed, stops the cleanup
+ * worker, and unregisters the file-system control devices.
+ */
+BOOL DOKANAPI DokanPrepareDriverUnload();
 
 #ifdef __cplusplus
 }

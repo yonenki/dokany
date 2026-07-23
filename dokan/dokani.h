@@ -43,6 +43,12 @@ typedef struct _DOKAN_INSTANCE_THREADINFO {
   TP_CALLBACK_ENVIRON CallbackEnvironment;
 } DOKAN_INSTANCE_THREADINFO;
 
+_Success_(return != FALSE)
+BOOL DokanQueryRuntimeIdentity(_In_ HANDLE Device,
+                               _Out_ PDOKAN_RUNTIME_IDENTITY Identity);
+BOOL DokanIsRuntimeIdentityCompatible(
+    _In_ const DOKAN_RUNTIME_IDENTITY *Identity);
+
 /**
  * \struct DOKAN_INSTANCE
  * \brief Dokan mount instance informations
@@ -80,6 +86,8 @@ typedef struct _DOKAN_INSTANCE {
   HANDLE Device;
   /** Device unmount event. It is set when the device is stopped */
   HANDLE DeviceClosedWaitHandle;
+  /** Set when a main pull worker is about to enter the driver. */
+  HANDLE DispatchStartedWaitHandle;
   /** Thread pool context of the mount instance */
   DOKAN_INSTANCE_THREADINFO ThreadInfo;
   /** Handle with the notify file opened at mount */
@@ -202,7 +210,8 @@ typedef struct _DOKAN_IO_EVENT {
        : 0)
 
 
-int DokanStart(_In_ PDOKAN_INSTANCE DokanInstance);
+int DokanStart(_In_ PDOKAN_INSTANCE DokanInstance,
+               _In_opt_ HANDLE CancellationEvent);
 
 BOOL SendToDevice(LPCWSTR DeviceName, DWORD IoControlCode, PVOID InputBuffer,
                   ULONG InputLength, PVOID OutputBuffer, ULONG OutputLength,

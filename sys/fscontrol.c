@@ -442,6 +442,46 @@ DokanGlobalUserFsRequest(__in PREQUEST_CONTEXT RequestContext) {
       return STATUS_SUCCESS;
     };
 
+    case FSCTL_GET_CAPABILITIES: {
+      PULONGLONG capabilities;
+      if (!PREPARE_OUTPUT(RequestContext->Irp, capabilities,
+                          /*SetInformationOnFailure=*/FALSE)) {
+        return STATUS_BUFFER_TOO_SMALL;
+      }
+      *capabilities = DOKAN_DRIVER_CAPABILITIES;
+      return STATUS_SUCCESS;
+    };
+
+    case FSCTL_GET_RUNTIME_IDENTITY: {
+      PDOKAN_RUNTIME_IDENTITY identity;
+      static const GUID familyGuid = DOKAN_DIST_FAMILY_GUID_INITIALIZER;
+      static const UCHAR profileHash[DOKAN_RUNTIME_IDENTITY_PROFILE_HASH_SIZE] =
+          DOKAN_DIST_PROFILE_HASH_BYTES;
+      if (!PREPARE_OUTPUT(RequestContext->Irp, identity,
+                          /*SetInformationOnFailure=*/FALSE)) {
+        return STATUS_BUFFER_TOO_SMALL;
+      }
+      RtlZeroMemory(identity, sizeof(*identity));
+      identity->Size = sizeof(*identity);
+      identity->SchemaVersion = DOKAN_DIST_SCHEMA_VERSION;
+      identity->ProtocolAbi = DOKAN_DIST_PROTOCOL_ABI;
+      identity->DriverVersion = DOKAN_DRIVER_VERSION;
+      identity->Capabilities = DOKAN_DRIVER_CAPABILITIES;
+      identity->FamilyGuid = familyGuid;
+      RtlCopyMemory(identity->ProfileHash, profileHash, sizeof(profileHash));
+      return STATUS_SUCCESS;
+    };
+
+    case FSCTL_PREPARE_UNLOAD: {
+      LUID loadDriverPrivilege =
+          RtlConvertLongToLuid(SE_LOAD_DRIVER_PRIVILEGE);
+      if (!SeSinglePrivilegeCheck(loadDriverPrivilege,
+                                  RequestContext->Irp->RequestorMode)) {
+        return STATUS_PRIVILEGE_NOT_HELD;
+      }
+      return DokanPrepareForUnload(RequestContext->DokanGlobal);
+    };
+
     case FSCTL_MOUNTPOINT_CLEANUP:
       RemoveSessionDevices(RequestContext, GetCurrentSessionId(RequestContext));
       return STATUS_SUCCESS;
@@ -531,6 +571,7 @@ NTSTATUS DokanProcessAndPullEvents(__in PREQUEST_CONTEXT RequestContext) {
   }
   // 3 - Flag the device as having workers starting to pull events.
   RequestContext->Vcb->HasEventWait = TRUE;
+  InterlockedExchange(&RequestContext->Dcb->DispatchReady, TRUE);
 
   PEVENT_INFORMATION eventInfo =
       (PEVENT_INFORMATION)(RequestContext->Irp->AssociatedIrp.SystemBuffer);
@@ -571,6 +612,17 @@ DokanDiskUserFsRequest(__in PREQUEST_CONTEXT RequestContext) {
   switch (RequestContext->IrpSp->Parameters.FileSystemControl.FsControlCode) {
     case FSCTL_EVENT_PROCESS_N_PULL:
       return DokanProcessAndPullEvents(&requestContext);
+    case FSCTL_EVENT_QUERY_DISPATCH_READY: {
+      PULONG dispatchReady;
+      if (!PREPARE_OUTPUT(RequestContext->Irp, dispatchReady,
+                          /*SetInformationOnFailure=*/FALSE)) {
+        return STATUS_BUFFER_TOO_SMALL;
+      }
+      *dispatchReady =
+          InterlockedCompareExchange(&RequestContext->Dcb->DispatchReady, 0,
+                                     0) != 0;
+      return STATUS_SUCCESS;
+    }
     case FSCTL_EVENT_RELEASE:
       return DokanEventRelease(&requestContext, requestContext.Vcb->DeviceObject);
     case FSCTL_EVENT_WRITE:
@@ -883,8 +935,6 @@ NTSTATUS DokanMountVolume(__in PREQUEST_CONTEXT RequestContext) {
   ClearLongFlag(volDeviceObject->Flags, DO_DEVICE_INITIALIZING);
   SetLongFlag(vcb->Flags, VCB_MOUNTED);
 
-  ObReferenceObject(volDeviceObject);
-
   DOKAN_LOG_FINE_IRP(RequestContext, "ExAcquireResourceExclusiveLite dcb resource");
   ExAcquireResourceExclusiveLite(&dcb->Resource, TRUE);
 
@@ -917,31 +967,42 @@ NTSTATUS DokanMountVolume(__in PREQUEST_CONTEXT RequestContext) {
   BOOLEAN isDriveLetter = IsMountPointDriveLetter(dcb->MountPoint);
   // Create mount point for the volume
   if (dcb->UseMountManager) {
-    BOOLEAN autoMountStateBackup = TRUE;
+    BOOLEAN autoMountStateBackup = FALSE;
+    BOOLEAN autoMountDisabled = FALSE;
     if (!isDriveLetter) {
       ExAcquireResourceExclusiveLite(&dcb->Global->MountManagerLock, TRUE);
       // Query current AutoMount State to restore it afterward.
-      DokanQueryAutoMount(&autoMountStateBackup);
-      // In case of failure, we suppose it was Enabled.
+      NTSTATUS autoMountStatus = DokanQueryAutoMount(
+          &autoMountStateBackup, dcb->MountCancellationEvent);
 
       // MountManager suggest workflow do not accept a path longer than
       // a driver letter mount point so we cannot use it to suggest
       // our directory mount point. We disable Mount Manager AutoMount
       // for avoiding having a driver letter assign to our device
       // for the time we create our own mount point.
-      if (autoMountStateBackup) {
-        DokanSendAutoMount(FALSE);
+      if (NT_SUCCESS(autoMountStatus) && autoMountStateBackup) {
+        autoMountStatus =
+            DokanSendAutoMount(FALSE, dcb->MountCancellationEvent);
+        autoMountDisabled = NT_SUCCESS(autoMountStatus);
       }
     }
-    status = DokanSendVolumeArrivalNotification(dcb->DiskDeviceName);
+    status = DokanSendVolumeArrivalNotification(
+        dcb->DiskDeviceName, dcb->MountCancellationEvent);
     if (!NT_SUCCESS(status)) {
       DokanLogError(&logger, status,
                     L"DokanSendVolumeArrivalNotification failed.");
+      if (NT_SUCCESS(dcb->MountManagerStatus)) {
+        dcb->MountManagerStatus = status;
+      }
+      dcb->MountManagerFailureFlags |=
+          DOKAN_DRIVER_INFO_VOLUME_ARRIVAL_FAILED;
     }
     if (!isDriveLetter) {
       // Restore previous AutoMount state.
-      if (autoMountStateBackup) {
-        DokanSendAutoMount(TRUE);
+      if (autoMountDisabled) {
+        // Restoration must not be skipped merely because startup was
+        // cancelled after AutoMount was disabled.
+        DokanSendAutoMount(TRUE, NULL);
       }
       ExReleaseResourceLite(&dcb->Global->MountManagerLock);
     }

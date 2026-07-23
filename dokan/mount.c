@@ -197,7 +197,7 @@ static BOOL DokanServiceControl(LPCWSTR ServiceName, ULONG Type) {
 #define DOKAN_EVENT_LOG_SYSTEM_SERVICE_KEY                                            \
   L"System\\CurrentControlSet\\Services\\EventLog\\System"
 #define DOKAN_SYS_PATH                                                         \
-  L"%SystemRoot%\\System32\\drivers\\dokan" DOKAN_MAJOR_API_VERSION L".sys"
+  DOKAN_DIST_DRIVER_SYSTEM_PATH_W
 
 VOID DokanDriverEventLogInstall() {
   HKEY key;
@@ -206,7 +206,7 @@ VOID DokanDriverEventLogInstall() {
 
   if (RegCreateKeyEx(
           HKEY_LOCAL_MACHINE,
-          DOKAN_EVENT_LOG_SYSTEM_SERVICE_KEY L"\\dokan" DOKAN_MAJOR_API_VERSION,
+          DOKAN_EVENT_LOG_SYSTEM_SERVICE_KEY L"\\" DOKAN_DIST_EVENT_LOG_SOURCE_W,
           0, NULL, REG_OPTION_NON_VOLATILE, KEY_ALL_ACCESS, NULL, &key,
           &position) != ERROR_SUCCESS) {
     return;
@@ -228,7 +228,7 @@ VOID DokanDriverEventLogUninstall() {
                     KEY_ALL_ACCESS, &key) != ERROR_SUCCESS) {
     return;
   }
-  RegDeleteKey(key, L"dokan" DOKAN_MAJOR_API_VERSION);
+  RegDeleteKey(key, DOKAN_DIST_EVENT_LOG_SOURCE_W);
   RegCloseKey(key);
 }
 
@@ -300,16 +300,17 @@ BOOL DOKANAPI DokanUnmount(WCHAR DriveLetter) {
 }
 
 #define DOKAN_NP_SERVICE_KEY                                                   \
-  L"System\\CurrentControlSet\\Services\\dokan" DOKAN_MAJOR_API_VERSION
+  L"System\\CurrentControlSet\\Services\\" DOKAN_DIST_NETWORK_PROVIDER_NAME_W
 #define DOKAN_NP_DEVICE_NAME                                                   \
-  L"\\Device\\DokanRedirector" DOKAN_MAJOR_API_VERSION
-#define DOKAN_NP_NAME L"Dokan" DOKAN_MAJOR_API_VERSION
+  DOKAN_DIST_REDIRECTOR_DEVICE_W
+#define DOKAN_NP_NAME DOKAN_DIST_NETWORK_PROVIDER_NAME_W
 #define DOKAN_NP_PATH                                                          \
-  L"%SystemRoot%\\System32\\dokannp" DOKAN_MAJOR_API_VERSION L".dll"
-#define DOKAN_BINARY_NAME L"dokannp" DOKAN_MAJOR_API_VERSION L".dll"
+  L"%SystemRoot%\\System32\\" DOKAN_DIST_NETWORK_PROVIDER_DLL_W L".dll"
+#define DOKAN_BINARY_NAME DOKAN_DIST_NETWORK_PROVIDER_FILENAME_W
 #define DOKAN_NP_ORDER_KEY                                                     \
   L"System\\CurrentControlSet\\Control\\NetworkProvider\\Order"
 
+#if DOKAN_DIST_NETWORK_PROVIDER_ENABLED
 BOOL DOKANAPI DokanNetworkProviderInstall() {
   HKEY key;
   DWORD position;
@@ -409,6 +410,17 @@ BOOL DOKANAPI DokanNetworkProviderUninstall() {
 
   return TRUE;
 }
+#else
+BOOL DOKANAPI DokanNetworkProviderInstall() {
+  SetLastError(ERROR_NOT_SUPPORTED);
+  return FALSE;
+}
+
+BOOL DOKANAPI DokanNetworkProviderUninstall() {
+  SetLastError(ERROR_NOT_SUPPORTED);
+  return FALSE;
+}
+#endif
 
 BOOL CreateMountPoint(LPCWSTR MountPoint, LPCWSTR DeviceName) {
   HANDLE handle;

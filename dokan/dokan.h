@@ -56,13 +56,13 @@ extern "C" {
 /** @{ */
 
 /** The current Dokan version (200 means ver 2.0.0). \ref DOKAN_OPTIONS.Version */
-#define DOKAN_VERSION 231
+#define DOKAN_VERSION DOKAN_DIST_LIBRARY_VERSION
 /** Minimum Dokan version (ver 2.0.0) accepted. */
 #define DOKAN_MINIMUM_COMPATIBLE_VERSION 200
 /** Driver file name including the DOKAN_MAJOR_API_VERSION */
-#define DOKAN_DRIVER_NAME L"dokan" DOKAN_MAJOR_API_VERSION L".sys"
+#define DOKAN_DRIVER_NAME DOKAN_DIST_BINARY_BASENAME_W L".sys"
 /** Network provider name including the DOKAN_MAJOR_API_VERSION */
-#define DOKAN_NP_NAME L"Dokan" DOKAN_MAJOR_API_VERSION
+#define DOKAN_NP_NAME DOKAN_DIST_NETWORK_PROVIDER_NAME_W
 
 /** @} */
 
@@ -813,6 +813,10 @@ typedef struct _DOKAN_OPERATIONS {
  * Requested an incompatible version.
  */
 #define DOKAN_VERSION_ERROR -7
+/** Dokan mount was cancelled through DokanCreateFileSystemEx. */
+#define DOKAN_CANCELLED_ERROR -8
+/** The installed driver does not support a feature required by the API. */
+#define DOKAN_DRIVER_FEATURE_ERROR -9
 
 /** @} */
 
@@ -872,6 +876,37 @@ int DOKANAPI DokanCreateFileSystem(_In_ PDOKAN_OPTIONS DokanOptions,
                                    _Out_ DOKAN_HANDLE *DokanInstance);
 
 /**
+ * \brief Mount a new Dokan Volume with cooperative startup cancellation.
+ *
+ * This is an additive variant of \ref DokanCreateFileSystem. The cancellation
+ * event may be signalled from another thread while startup is in progress. A
+ * \ref DOKAN_CANCELLED_ERROR result means startup cleanup has completed and no
+ * filesystem instance will become mounted later from that request.
+ *
+ * The caller must keep \p CancellationEvent, \p DokanOptions,
+ * \p DokanOperations, and callback-owned state valid until this function
+ * returns. Passing \c NULL preserves the legacy non-cancellable behavior.
+ * Cancellation is cooperative. Dokany requests cancellation of pending lower
+ * driver operations and waits for their exact completion before returning. A
+ * lower driver that does not complete a cancelled request can therefore keep
+ * this call blocked; use process isolation when a hard termination bound is
+ * required for that failure class.
+ *
+ * \param DokanOptions a \ref DOKAN_OPTIONS that describes the mount.
+ * \param DokanOperations callbacks for requests made by the kernel.
+ * \param CancellationEvent optional manual-reset event whose signalled state
+ * requests cancellation.
+ * \param DokanInstance receives the mount instance only on success.
+ * \return \ref DokanMainResult status, including
+ * \ref DOKAN_CANCELLED_ERROR and \ref DOKAN_DRIVER_FEATURE_ERROR.
+ */
+int DOKANAPI DokanCreateFileSystemEx(
+    _In_ PDOKAN_OPTIONS DokanOptions,
+    _In_ PDOKAN_OPERATIONS DokanOperations,
+    _In_opt_ HANDLE CancellationEvent,
+    _Out_ DOKAN_HANDLE *DokanInstance);
+
+/**
  * \brief Check if the FileSystem is still running or not.
  *
  * \param DokanInstance The dokan mount context created by \ref DokanCreateFileSystem .
@@ -913,6 +948,22 @@ BOOL DOKANAPI DokanRegisterWaitForFileSystemClosed(
  */
 BOOL DOKANAPI DokanUnregisterWaitForFileSystemClosed(_In_ HANDLE WaitHandle,
                                                      BOOL WaitForCallbacks);
+
+/**
+ * \brief Request an unmount of a Dokan instance without waiting for it to close.
+ *
+ * Unlike \ref DokanRemoveMountPoint, this function targets the exact instance
+ * represented by \p DokanInstance instead of looking it up by mount point. The
+ * request is idempotent. Use \ref DokanWaitForFileSystemClosed to wait for the
+ * unmount to complete and \ref DokanCloseHandle to release the instance after
+ * it has closed.
+ *
+ * \param DokanInstance The Dokan mount context created by
+ * \ref DokanCreateFileSystem.
+ * \return \c TRUE if the instance was already closed or the unmount request
+ * was sent successfully; otherwise \c FALSE.
+ */
+BOOL DOKANAPI DokanRequestUnmount(_In_ DOKAN_HANDLE DokanInstance);
 
 /**
  * \brief Unmount the Dokan instance.
@@ -973,6 +1024,20 @@ ULONG DOKANAPI DokanVersion();
  * \return The version of Dokan driver or 0 on failure.
  */
 ULONG DOKANAPI DokanDriverVersion();
+
+/**
+ * \brief Get the immutable identity of the driver opened by this DLL family.
+ *
+ * The call fails when the driver does not expose the identity protocol. A
+ * successful call only reports the identity; mount creation additionally
+ * verifies it against the DLL's compiled distribution profile.
+ *
+ * \param Identity Receives a fixed-layout \ref DOKAN_RUNTIME_IDENTITY.
+ * \return TRUE on success, otherwise FALSE with GetLastError preserved.
+ */
+_Success_(return != FALSE)
+BOOL DOKANAPI DokanGetRuntimeIdentity(
+    _Out_ PDOKAN_RUNTIME_IDENTITY Identity);
 
 /**
  * \brief Extends the timeout of the current IO operation in driver.

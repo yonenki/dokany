@@ -24,7 +24,8 @@ NTSTATUS
 DokanSendIoContlToMountManager(__in ULONG IoControlCode,
                                __in_opt PVOID InputBuffer, __in ULONG Length,
                                __out PVOID OutputBuffer,
-                               __in ULONG OutputLength) {
+                               __in ULONG OutputLength,
+                               __in_opt PKEVENT CancellationEvent) {
   NTSTATUS status;
   UNICODE_STRING mountManagerName;
   PFILE_OBJECT mountFileObject;
@@ -44,6 +45,11 @@ DokanSendIoContlToMountManager(__in ULONG IoControlCode,
     return status;
   }
 
+  if (CancellationEvent && KeReadStateEvent(CancellationEvent)) {
+    ObDereferenceObject(mountFileObject);
+    return STATUS_CANCELLED;
+  }
+
   KeInitializeEvent(&driverEvent, NotificationEvent, FALSE);
 
   DOKAN_LOG_("Build Irp for IoControlCode=%s", DokanGetIoctlStr(IoControlCode));
@@ -53,6 +59,7 @@ DokanSendIoContlToMountManager(__in ULONG IoControlCode,
 
   if (irp == NULL) {
     DOKAN_LOG("IoBuildDeviceIoControlRequest failed");
+    ObDereferenceObject(mountFileObject);
     return STATUS_INSUFFICIENT_RESOURCES;
   }
 
@@ -61,9 +68,23 @@ DokanSendIoContlToMountManager(__in ULONG IoControlCode,
   if (status == STATUS_PENDING) {
     DOKAN_LOG_("IoCallDriver IoControlCode=%s pending",
                DokanGetIoctlStr(IoControlCode));
-    KeWaitForSingleObject(&driverEvent, Executive, KernelMode, FALSE, NULL);
+    if (CancellationEvent) {
+      PVOID waitObjects[] = {&driverEvent, CancellationEvent};
+      NTSTATUS waitStatus = KeWaitForMultipleObjects(
+          RTL_NUMBER_OF(waitObjects), waitObjects, WaitAny, Executive,
+          KernelMode, FALSE, NULL, NULL);
+      if (waitStatus == STATUS_WAIT_1) {
+        IoCancelIrp(irp);
+        KeWaitForSingleObject(&driverEvent, Executive, KernelMode, FALSE, NULL);
+        status = STATUS_CANCELLED;
+      }
+    } else {
+      KeWaitForSingleObject(&driverEvent, Executive, KernelMode, FALSE, NULL);
+    }
   }
-  status = iosb.Status;
+  if (status != STATUS_CANCELLED) {
+    status = iosb.Status;
+  }
 
   ObDereferenceObject(mountFileObject);
   // Don't dereference mountDeviceObject, mountFileObject is enough
@@ -110,22 +131,25 @@ NTSTATUS DokanSendVolumeMountPoint(__in PDokanDCB Dcb, BOOLEAN Create) {
   status = DokanSendIoContlToMountManager(
       Create ? IOCTL_MOUNTMGR_VOLUME_MOUNT_POINT_CREATED
              : IOCTL_MOUNTMGR_VOLUME_MOUNT_POINT_DELETED,
-      volumMountPoint, length, NULL, 0);
+      volumMountPoint, length, NULL, 0,
+      // Startup cancellation must never interrupt teardown, nor may teardown
+      // borrow the startup event while its owner is about to release it.
+      Create ? Dcb->MountCancellationEvent : NULL);
 
   ExFreePool(volumMountPoint);
   return status;
 }
 
-VOID NotifyDirectoryMountPointCreated(__in PDokanDCB Dcb) {
-  DokanSendVolumeMountPoint(Dcb, /*Create*/ TRUE);
+NTSTATUS NotifyDirectoryMountPointCreated(__in PDokanDCB Dcb) {
+  return DokanSendVolumeMountPoint(Dcb, /*Create*/ TRUE);
 }
 
-VOID NotifyDirectoryMountPointDeleted(__in PDokanDCB Dcb) {
-  DokanSendVolumeMountPoint(Dcb, /*Create*/ FALSE);
+NTSTATUS NotifyDirectoryMountPointDeleted(__in PDokanDCB Dcb) {
+  return DokanSendVolumeMountPoint(Dcb, /*Create*/ FALSE);
 }
 
-NTSTATUS
-DokanSendVolumeArrivalNotification(PUNICODE_STRING DeviceName) {
+NTSTATUS DokanSendVolumeArrivalNotification(
+    PUNICODE_STRING DeviceName, __in_opt PKEVENT CancellationEvent) {
   NTSTATUS status;
   PMOUNTMGR_TARGET_NAME targetName;
   ULONG length;
@@ -142,7 +166,8 @@ DokanSendVolumeArrivalNotification(PUNICODE_STRING DeviceName) {
   RtlCopyMemory(targetName->DeviceName, DeviceName->Buffer, DeviceName->Length);
 
   status = DokanSendIoContlToMountManager(
-      IOCTL_MOUNTMGR_VOLUME_ARRIVAL_NOTIFICATION, targetName, length, NULL, 0);
+      IOCTL_MOUNTMGR_VOLUME_ARRIVAL_NOTIFICATION, targetName, length, NULL, 0,
+      CancellationEvent);
 
   ExFreePool(targetName);
   return status;
@@ -201,7 +226,7 @@ DokanSendVolumeDeletePoints(__in PUNICODE_STRING MountPoint,
   }
 
   status = DokanSendIoContlToMountManager(IOCTL_MOUNTMGR_DELETE_POINTS, point,
-                                          length, deletedPoints, olength);
+                                          length, deletedPoints, olength, NULL);
 
   ExFreePool(point);
   ExFreePool(deletedPoints);
@@ -211,7 +236,8 @@ DokanSendVolumeDeletePoints(__in PUNICODE_STRING MountPoint,
 NTSTATUS
 DokanSendVolumeCreatePoint(__in PDRIVER_OBJECT DriverObject,
                            __in PUNICODE_STRING DeviceName,
-                           __in PUNICODE_STRING MountPoint) {
+                           __in PUNICODE_STRING MountPoint,
+                           __in_opt PKEVENT CancellationEvent) {
   NTSTATUS status;
   PMOUNTMGR_CREATE_POINT_INPUT point;
   ULONG length;
@@ -239,7 +265,7 @@ DokanSendVolumeCreatePoint(__in PDRIVER_OBJECT DriverObject,
                 MountPoint->Buffer, MountPoint->Length);
 
   status = DokanSendIoContlToMountManager(IOCTL_MOUNTMGR_CREATE_POINT, point,
-                                          length, NULL, 0);
+                                          length, NULL, 0, CancellationEvent);
 
   if (NT_SUCCESS(status)) {
     DokanLogInfo(&logger, L"IOCTL_MOUNTMGR_CREATE_POINT succeeded.");
@@ -252,13 +278,15 @@ DokanSendVolumeCreatePoint(__in PDRIVER_OBJECT DriverObject,
   return status;
 }
 
-NTSTATUS DokanQueryAutoMount(PBOOLEAN State) {
+NTSTATUS DokanQueryAutoMount(PBOOLEAN State,
+                             __in_opt PKEVENT CancellationEvent) {
   NTSTATUS status;
   MOUNTMGR_QUERY_AUTO_MOUNT queryAutoMount;
 
   status =
       DokanSendIoContlToMountManager(IOCTL_MOUNTMGR_QUERY_AUTO_MOUNT, NULL, 0,
-                                     &queryAutoMount, sizeof(queryAutoMount));
+                                     &queryAutoMount, sizeof(queryAutoMount),
+                                     CancellationEvent);
   if (NT_SUCCESS(status)) {
     DOKAN_LOG_("CurrentState: %d", queryAutoMount.CurrentState);
     *State = queryAutoMount.CurrentState;
@@ -267,7 +295,8 @@ NTSTATUS DokanQueryAutoMount(PBOOLEAN State) {
   return status;
 }
 
-NTSTATUS DokanSendAutoMount(BOOLEAN State) {
+NTSTATUS DokanSendAutoMount(BOOLEAN State,
+                            __in_opt PKEVENT CancellationEvent) {
   NTSTATUS status;
   MOUNTMGR_SET_AUTO_MOUNT setAutoMount;
 
@@ -275,6 +304,6 @@ NTSTATUS DokanSendAutoMount(BOOLEAN State) {
   DOKAN_LOG_("State %d", setAutoMount.NewState);
   status = DokanSendIoContlToMountManager(IOCTL_MOUNTMGR_SET_AUTO_MOUNT,
                                           &setAutoMount, sizeof(setAutoMount),
-                                          NULL, 0);
+                                          NULL, 0, CancellationEvent);
   return status;
 }

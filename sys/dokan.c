@@ -178,24 +178,23 @@ DokanLookasideCreate(__in LOOKASIDE_LIST_EX *pCache, __in size_t cbElement) {
   return TRUE;
 }
 
-VOID CleanupGlobalDiskDevice(PDOKAN_GLOBAL dokanGlobal) {
+VOID DokanCleanupGlobalDiskDevice(PDOKAN_GLOBAL dokanGlobal) {
   WCHAR symbolicLinkBuf[] = DOKAN_GLOBAL_SYMBOLIC_LINK_NAME;
   UNICODE_STRING symbolicLinkName;
 
-  KeSetEvent(&dokanGlobal->KillDeleteDeviceEvent, 0, FALSE);
+  DokanStopDeleteDeviceThread(dokanGlobal);
 
   RtlInitUnicodeString(&symbolicLinkName, symbolicLinkBuf);
   IoDeleteSymbolicLink(&symbolicLinkName);
 
-  IoUnregisterFileSystem(dokanGlobal->FsDiskDeviceObject);
-  IoUnregisterFileSystem(dokanGlobal->FsCdDeviceObject);
+  DokanUnregisterFileSystems(dokanGlobal);
 
-  IoDeleteDevice(dokanGlobal->FsDiskDeviceObject);
-  IoDeleteDevice(dokanGlobal->FsCdDeviceObject);
-  IoDeleteDevice(dokanGlobal->DeviceObject);
   ExDeleteResourceLite(&dokanGlobal->Resource);
   ExDeleteResourceLite(&dokanGlobal->MountPointListLock);
   ExDeleteResourceLite(&dokanGlobal->MountManagerLock);
+  IoDeleteDevice(dokanGlobal->FsDiskDeviceObject);
+  IoDeleteDevice(dokanGlobal->FsCdDeviceObject);
+  IoDeleteDevice(dokanGlobal->DeviceObject);
 }
 
 VOID InitMultiVersionResources() {
@@ -325,7 +324,7 @@ Return Value:
       FsRtlRegisterFileSystemFilterCallbacks(DriverObject, &filterCallbacks);
 
   if (!NT_SUCCESS(status)) {
-    CleanupGlobalDiskDevice(dokanGlobal);
+    DokanCleanupGlobalDiskDevice(dokanGlobal);
     DOKAN_LOG_("  FsRtlRegisterFileSystemFilterCallbacks returned 0x%x %s",
               status, DokanGetNTSTATUSStr(status));
     return status;
@@ -333,13 +332,13 @@ Return Value:
 
   if (!DokanLookasideCreate(&g_DokanCCBLookasideList, sizeof(DokanCCB))) {
     DOKAN_LOG("DokanLookasideCreate g_DokanCCBLookasideList failed");
-    CleanupGlobalDiskDevice(dokanGlobal);
+    DokanCleanupGlobalDiskDevice(dokanGlobal);
     return STATUS_INSUFFICIENT_RESOURCES;
   }
 
   if (!DokanLookasideCreate(&g_DokanFCBLookasideList, sizeof(DokanFCB))) {
     DOKAN_LOG("DokanLookasideCreate g_DokanFCBLookasideList failed");
-    CleanupGlobalDiskDevice(dokanGlobal);
+    DokanCleanupGlobalDiskDevice(dokanGlobal);
     ExDeleteLookasideListEx(&g_DokanCCBLookasideList);
     return STATUS_INSUFFICIENT_RESOURCES;
   }
@@ -347,7 +346,7 @@ Return Value:
   if (!DokanLookasideCreate(&g_DokanEResourceLookasideList,
                             sizeof(ERESOURCE))) {
     DOKAN_LOG("DokanLookasideCreate g_DokanEResourceLookasideList failed");
-    CleanupGlobalDiskDevice(dokanGlobal);
+    DokanCleanupGlobalDiskDevice(dokanGlobal);
     ExDeleteLookasideListEx(&g_DokanCCBLookasideList);
     ExDeleteLookasideListEx(&g_DokanFCBLookasideList);
     return STATUS_INSUFFICIENT_RESOURCES;
@@ -383,16 +382,9 @@ Return Value:
 
 {
 
-  PDEVICE_OBJECT deviceObject = DriverObject->DeviceObject;
-  PDOKAN_GLOBAL dokanGlobal;
-
   PAGED_CODE();
-
-  dokanGlobal = deviceObject->DeviceExtension;
-  if (GetIdentifierType(dokanGlobal) == DGL) {
-    DOKAN_LOG("Delete Global DeviceObject");
-    CleanupGlobalDiskDevice(dokanGlobal);
-  }
+  ASSERT(DriverObject->DeviceObject == NULL);
+  UNREFERENCED_PARAMETER(DriverObject);
 
   ExDeleteNPagedLookasideList(&DokanIrpEntryLookasideList);
 
@@ -401,6 +393,8 @@ Return Value:
   ExDeleteLookasideListEx(&g_DokanEResourceLookasideList);
 
   DOKAN_LOG("All resources released");
+  ASSERT(IsListEmpty(&g_DokanLogEntryList.Log));
+  ExDeleteResourceLite(&g_DokanLogEntryList.Resource);
 }
 
 NTSTATUS

@@ -100,6 +100,6 @@ void memfs::wait() {
   DokanCloseHandle(instance);
 }
 
-void memfs::stop() { DokanRemoveMountPoint(mount_point); }
+void memfs::stop() { DokanRequestUnmount(instance); }
 
 } // namespace memfs

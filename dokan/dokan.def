@@ -1,37 +1,41 @@
 
-LIBRARY	dokan2
-
 EXPORTS
 
-DokanMain
-DokanUnmount
-DokanIsNameInExpression
-DokanServiceInstall
-DokanServiceDelete
-DokanVersion
-DokanDriverVersion
-DokanResetTimeout
-DokanNetworkProviderInstall
-DokanNetworkProviderUninstall
-DokanSetDebugMode
-DokanOpenRequestorToken
-DokanRemoveMountPoint
-DokanUseStdErr
-DokanDebugMode
-DokanMapKernelToUserCreateFileFlags
-DokanGetMountPointList
-DokanReleaseMountPointList
-DokanNtStatusFromWin32
-DokanNotifyCreate
-DokanNotifyDelete
-DokanNotifyUpdate
-DokanNotifyXAttrUpdate
-DokanNotifyRename
-DokanInit
-DokanShutdown
-DokanCreateFileSystem
-DokanIsFileSystemRunning
-DokanWaitForFileSystemClosed
-DokanRegisterWaitForFileSystemClosed
-DokanUnregisterWaitForFileSystemClosed
-DokanCloseHandle
+; Preserve the ordinals published by Dokany 2.3.1. New exports must use a new
+; ordinal so applications importing an existing function by ordinal keep working.
+DokanMain @9
+DokanUnmount @28
+DokanIsNameInExpression @8
+DokanServiceInstall @25
+DokanServiceDelete @24
+DokanVersion @31
+DokanDriverVersion @4
+DokanResetTimeout @23
+DokanNetworkProviderInstall @11
+DokanNetworkProviderUninstall @12
+DokanSetDebugMode @26
+DokanOpenRequestorToken @19
+DokanRemoveMountPoint @22
+DokanUseStdErr @30
+DokanDebugMode @3
+DokanMapKernelToUserCreateFileFlags @10
+DokanGetMountPointList @5
+DokanReleaseMountPointList @21
+DokanNtStatusFromWin32 @18
+DokanNotifyCreate @13
+DokanNotifyDelete @14
+DokanNotifyUpdate @16
+DokanNotifyXAttrUpdate @17
+DokanNotifyRename @15
+DokanInit @6
+DokanShutdown @27
+DokanCreateFileSystem @2
+DokanIsFileSystemRunning @7
+DokanWaitForFileSystemClosed @32
+DokanRegisterWaitForFileSystemClosed @20
+DokanUnregisterWaitForFileSystemClosed @29
+DokanCloseHandle @1
+DokanRequestUnmount @33
+DokanCreateFileSystemEx @34
+DokanGetRuntimeIdentity @35
+DokanPrepareDriverUnload @36

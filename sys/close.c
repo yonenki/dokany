@@ -51,6 +51,12 @@ Return Value:
   DOKAN_INIT_LOGGER(logger, RequestContext->DeviceObject->DriverObject,
                     IRP_MJ_CLOSE);
 
+  if (RequestContext->DokanGlobal != NULL) {
+    RequestContext->DeleteGlobalDevicesAfterDispatch =
+        DokanReleaseGlobalControlHandle(RequestContext->DokanGlobal);
+    return STATUS_SUCCESS;
+  }
+
   fileObject = RequestContext->IrpSp->FileObject;
   DOKAN_LOG_FINE_IRP(RequestContext, "FileObject=%p", fileObject);
 

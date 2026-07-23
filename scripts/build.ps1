@@ -1,16 +1,71 @@
 param (
 	[string[]]$BuildPart = @('win', 'cygwin'),
 	[string[]]$Platforms = @('Win32', 'x64', 'ARM', 'ARM64'),
-	[string[]]$Configurations = @('Release', 'Debug')
+	[string[]]$Configurations = @('Release', 'Debug'),
+	[string]$DistributionProfile = '.\profiles\upstream.json',
+	[string]$PlatformToolset = '',
+	[string]$WindowsTargetPlatformVersion = '',
+	[ValidateSet('Off', 'TestSign', 'ProductionSign')]
+	[string]$DriverSignMode = 'Off'
 )
 
 . .\scripts\build_helper.ps1
 
 $ErrorActionPreference = "Stop"
 
+# Keep machine-local first-run state and telemetry banners out of the
+# machine-readable distribution profile output consumed below.
+$env:DOTNET_NOLOGO = '1'
+$env:DOTNET_CLI_TELEMETRY_OPTOUT = '1'
+
 Add-VisualStudio-Path
 
-if ($env:APPVEYOR -eq "True") { $CI_BUILD_ARG="/l:C:\Program Files\AppVeyor\BuildAgent\Appveyor.MSBuildLogger.dll" }
+if ([string]::IsNullOrWhiteSpace($PlatformToolset)) {
+	$vsWhere = "${Env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+	$visualStudioVersion = & $vsWhere -latest -products * -requires Microsoft.Component.MSBuild -property installationVersion
+	$visualStudioMajor = [int]($visualStudioVersion -split '\.')[0]
+	$PlatformToolset = switch ($visualStudioMajor) {
+		{ $_ -ge 17 } { 'v143'; break }
+		16 { 'v142'; break }
+		default { throw "Unsupported Visual Studio major version: $visualStudioMajor" }
+	}
+}
+
+if ([string]::IsNullOrWhiteSpace($WindowsTargetPlatformVersion)) {
+	$windowsKitIncludeRoot = "${Env:ProgramFiles(x86)}\Windows Kits\10\Include"
+	$WindowsTargetPlatformVersion = Get-ChildItem -LiteralPath $windowsKitIncludeRoot -Directory |
+		ForEach-Object {
+			$parsed = $null
+			if ([version]::TryParse($_.Name, [ref]$parsed)) { $parsed }
+		} |
+		Sort-Object -Descending |
+		Select-Object -First 1
+	if ($null -eq $WindowsTargetPlatformVersion) {
+		throw "No Windows 10/11 SDK was found below $windowsKitIncludeRoot."
+	}
+	$WindowsTargetPlatformVersion = $WindowsTargetPlatformVersion.ToString()
+}
+
+$distributionProfilePath = (Resolve-Path -LiteralPath $DistributionProfile).Path
+$profileInfoJson = & dotnet run --project .\tools\DistributionProfile\DistributionProfile.csproj -- validate $distributionProfilePath
+if ($LASTEXITCODE -ne 0) {
+	throw "Distribution profile validation failed with exit code $LASTEXITCODE."
+}
+$profileInfo = $profileInfoJson | ConvertFrom-Json
+$repositoryRoot = (Resolve-Path .).Path
+$sourceCommit = (& git -C $repositoryRoot rev-parse HEAD).Trim()
+if ($LASTEXITCODE -ne 0 -or $sourceCommit -notmatch '^[0-9a-fA-F]{40}$') {
+	throw 'Unable to resolve a full Git source commit for distribution generation.'
+}
+$sourceCommit = $sourceCommit.ToLowerInvariant()
+$distributionProfileRoot = Join-Path $repositoryRoot "BuildOutput\profiles\$($profileInfo.distributionId)-$($profileInfo.profileHash)\$sourceCommit"
+Exec-External { dotnet run --project .\tools\DistributionProfile\DistributionProfile.csproj -- generate $distributionProfilePath $distributionProfileRoot $sourceCommit }
+$env:DOKAN_DISTRIBUTION_PROFILE_ROOT = $distributionProfileRoot
+
+$ciBuildArgument = $null
+if ($env:APPVEYOR -eq "True") {
+	$ciBuildArgument = "/l:C:\Program Files\AppVeyor\BuildAgent\Appveyor.MSBuildLogger.dll"
+}
 $msBuildPath=& Get-Command msbuild | Select-Object -ExpandProperty Definition
 if (!([bool](Get-Command -Name buildWrapper -ErrorAction SilentlyContinue))) {
 	set-alias buildWrapper "$msBuildPath"
@@ -20,7 +75,7 @@ if ($BuildPart -contains 'win') {
 	foreach ($Configuration in $Configurations) {
 		foreach ($Platform in $Platforms) {
 			Write-Host Build dokan $Configuration $Platform ...
-			Exec-External { buildWrapper .\dokan.sln /p:Configuration=$Configuration /p:Platform=$Platform /t:Build $CI_BUILD_ARG }
+			Exec-External { buildWrapper .\dokan.sln /p:Configuration=$Configuration /p:Platform=$Platform /p:PlatformToolset=$PlatformToolset /p:WindowsTargetPlatformVersion=$WindowsTargetPlatformVersion /p:DokanDistributionProfileRoot="$distributionProfileRoot" /p:SignMode=$DriverSignMode /t:Build $ciBuildArgument }
 			Write-Host Build dokan $Configuration $Platform done !
 		}
 	}

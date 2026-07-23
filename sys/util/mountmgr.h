@@ -30,33 +30,38 @@ with this program. If not, see <http://www.gnu.org/licenses/>.
 NTSTATUS DokanSendVolumeMountPoint(__in PDokanDCB Dcb, BOOLEAN Create);
 
 //  Query the AutoMount property state.
-NTSTATUS DokanQueryAutoMount(PBOOLEAN State);
+NTSTATUS DokanQueryAutoMount(PBOOLEAN State,
+                             __in_opt PKEVENT CancellationEvent);
 
 // Change the AutoMount property.
 // Disabling AutoMount will make MountManage to not ask for a drive letter
 // suggestion and assign the one we suggested or another one.
-NTSTATUS DokanSendAutoMount(BOOLEAN State);
+NTSTATUS DokanSendAutoMount(BOOLEAN State,
+                            __in_opt PKEVENT CancellationEvent);
 
 // Notify a new device arrived and is available to be registered.
-NTSTATUS DokanSendVolumeArrivalNotification(PUNICODE_STRING DeviceName);
+NTSTATUS DokanSendVolumeArrivalNotification(
+    PUNICODE_STRING DeviceName, __in_opt PKEVENT CancellationEvent);
 
 // Sends a control code directly to the MountManager.
 NTSTATUS
 DokanSendIoContlToMountManager(__in ULONG IoControlCode,
                                __in_opt PVOID InputBuffer, __in ULONG Length,
                                __out PVOID OutputBuffer,
-                               __in ULONG OutputLength);
+                               __in ULONG OutputLength,
+                               __in_opt PKEVENT CancellationEvent);
 
-// Inform MountManager of the new MountPoint linked to the persistante volum.
-VOID NotifyDirectoryMountPointCreated(__in PDokanDCB pDcb);
-VOID NotifyDirectoryMountPointDeleted(__in PDokanDCB pDcb);
+// Inform MountManager of the new MountPoint linked to the persistent volume.
+NTSTATUS NotifyDirectoryMountPointCreated(__in PDokanDCB pDcb);
+NTSTATUS NotifyDirectoryMountPointDeleted(__in PDokanDCB pDcb);
 
 // Explicitly request mount manager to create a specific mount point for the
 // DeviceName. It is outside the volume arrival notification workflow.
 NTSTATUS
 DokanSendVolumeCreatePoint(__in PDRIVER_OBJECT DriverObject,
                            __in PUNICODE_STRING DeviceName,
-                           __in PUNICODE_STRING MountPoint);
+                           __in PUNICODE_STRING MountPoint,
+                           __in_opt PKEVENT CancellationEvent);
 
 // Request mount manager to delete a specific mount point attached to the
 // DeviceName.
