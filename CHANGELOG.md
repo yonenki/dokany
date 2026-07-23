@@ -10,6 +10,7 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/) and this p
 - Library - Add `DokanCreateFileSystemEx` with cooperative startup cancellation.
 - Kernel/Library - Add negotiated dispatch-ready and startup-cancellation protocol capabilities without changing legacy protocol structures.
 - Library - Add `DOKAN_OPTIONS.ThreadCount` (Version >= 232) to control the per-mount event pull thread count.
+- Kernel/Library - Add an opt-in mount quota: `MountQuotaMax` registry value or `FSCTL_SET_MOUNT_QUOTA` (admin), enforced at mount start with a clean `DOKAN_MOUNT_QUOTA_ERROR` rejection.
 - Tests - Add dynamic security regression suite in `scripts/tests/security/` covering the event-channel, rename-Ex, device-delete, query-security, and scaling PoCs.
 
 ### Fixed

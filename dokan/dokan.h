@@ -829,6 +829,8 @@ typedef struct _DOKAN_OPERATIONS {
 #define DOKAN_CANCELLED_ERROR -8
 /** The installed driver does not support a feature required by the API. */
 #define DOKAN_DRIVER_FEATURE_ERROR -9
+/** The mount was rejected because the driver's mount quota was reached. */
+#define DOKAN_MOUNT_QUOTA_ERROR -10
 
 /** @} */
 

@@ -14,8 +14,8 @@ from the PoC that originally demonstrated the issue on a live system.
 | `RenameEx-2195` | textil#2195 | A rename-Ex/open storm completes (was an AVL corruption BSOD) |
 | `MountStorm-2196` | textil#2196 | A parallel mount/unmount storm completes (was a `LIST_ENTRY` corruption BSOD) |
 | `Scaling-2205` | textil#2205 | With `DOKAN_OPTIONS.ThreadCount = 1` a single host process mounts far beyond the historical ~90-mount ceiling |
-| `NpGetConnection-2198` | textil#2198 (XFAIL, unfixed) | `NPGetConnection` must not write past the declared buffer size |
-| `MountQuota-2199` | textil#2199 (XFAIL, by design for now) | Documents that no mount quota exists |
+| `MountQuota-2199` | textil#2199 | Mounts beyond the configured quota are cleanly rejected with `DOKAN_MOUNT_QUOTA_ERROR` |
+| `NpGetConnection-2198` | textil#2198 | `NPGetConnection` stays within the declared buffer size |
 | `MirrorSmoke` | — | Basic create/read/rename on a mounted volume |
 
 `XFAIL` means the secure behavior is asserted and expected to fail until the

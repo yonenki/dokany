@@ -205,6 +205,24 @@ BOOL DOKANAPI DokanMountPointsCleanUp();
  */
 BOOL DOKANAPI DokanPrepareDriverUnload();
 
+/**
+ * \brief Query the driver's mount quota.
+ *
+ * \param[out] QuotaMax receives the maximum number of concurrently mounted
+ * volumes; 0 means no quota.
+ */
+BOOL DOKANAPI DokanGetMountQuota(PLONG QuotaMax);
+
+/**
+ * \brief Set the driver's mount quota. Requires administrative privileges.
+ *
+ * Once the number of mounted volumes reaches QuotaMax, further mount
+ * requests are cleanly rejected with DOKAN_MOUNT_QUOTA_ERROR.
+ * \param[in] QuotaMax maximum number of concurrently mounted volumes;
+ * 0 disables the quota.
+ */
+BOOL DOKANAPI DokanSetMountQuota(LONG QuotaMax);
+
 #ifdef __cplusplus
 }
 #endif

@@ -1568,6 +1568,9 @@ int DokanStart(_In_ PDOKAN_INSTANCE DokanInstance,
       DokanDbgPrint("Dokan Error: driver version mismatch, driver %X, dll %X\n",
                     driverInfo->DriverVersion, eventStart->UserVersion);
       status = DOKAN_VERSION_ERROR;
+    } else if (driverInfo->Flags & DOKAN_DRIVER_INFO_MOUNT_QUOTA_EXCEEDED) {
+      DokanDbgPrint("Dokan Error: mount quota exceeded\n");
+      status = DOKAN_MOUNT_QUOTA_ERROR;
     } else if (driverInfo->Flags & DOKAN_DRIVER_INFO_NO_MOUNT_POINT_ASSIGNED) {
       DokanDbgPrint("Dokan Error: Driver failed to set mount point %s\n",
                     eventStart->MountPoint);
@@ -1605,6 +1608,19 @@ BOOL DOKANAPI DokanSetDebugMode(ULONG Mode) {
   return SendToDevice(DOKAN_GLOBAL_DEVICE_NAME, FSCTL_SET_DEBUG_MODE, &Mode,
                       sizeof(ULONG), NULL, 0, &returnedLength);
 }
+
+BOOL DOKANAPI DokanGetMountQuota(PLONG QuotaMax) {
+  ULONG returnedLength;
+  return SendToDevice(DOKAN_GLOBAL_DEVICE_NAME, FSCTL_GET_MOUNT_QUOTA, NULL, 0,
+                      QuotaMax, sizeof(LONG), &returnedLength);
+}
+
+BOOL DOKANAPI DokanSetMountQuota(LONG QuotaMax) {
+  ULONG returnedLength;
+  return SendToDevice(DOKAN_GLOBAL_DEVICE_NAME, FSCTL_SET_MOUNT_QUOTA,
+                      &QuotaMax, sizeof(LONG), NULL, 0, &returnedLength);
+}
+
 
 BOOL DOKANAPI DokanMountPointsCleanUp() {
   ULONG returnedLength;

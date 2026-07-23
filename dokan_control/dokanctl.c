@@ -55,6 +55,7 @@ int ShowUsage() {
           "  /r n                : Remove network provider\n"
           "  /l a                : List current mount points\n"
           "  /d [0-7]            : Enable Kernel Debug output\n"
+          "  /o [n]              : Query (no arg) or set the mount quota (0 = off)\n"
           "  /q                  : Print runtime identity as JSON\n"
           "  /p                  : Prepare driver for service stop\n"
           "  /v                  : Print Dokan version\n");
@@ -242,6 +243,29 @@ int __cdecl wmain(int argc, PWCHAR argv[]) {
     } else {
       fprintf(stderr, "set debug mode failed\n");
       return EXIT_FAILURE;
+    }
+  } break;
+
+  case L'o': {
+    if (argc < 3) {
+      LONG quota = 0;
+      if (DokanGetMountQuota(&quota)) {
+        fwprintf(stdout, L"Mount quota: %ld\n", quota);
+      } else {
+        fwprintf(stderr, L"Failed to query mount quota: %lu\n", GetLastError());
+        return EXIT_FAILURE;
+      }
+    } else {
+      LONG quota = _wtol(argv[2]);
+      if (quota < 0) {
+        return DefaultCaseOption();
+      }
+      if (DokanSetMountQuota(quota)) {
+        fwprintf(stdout, L"Mount quota set to %ld\n", quota);
+      } else {
+        fwprintf(stderr, L"Failed to set mount quota: %lu\n", GetLastError());
+        return EXIT_FAILURE;
+      }
     }
   } break;
 

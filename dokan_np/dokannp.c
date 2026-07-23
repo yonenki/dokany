@@ -302,7 +302,12 @@ DWORD APIENTRY NPGetConnection(__in LPWSTR LocalName, __out LPWSTR RemoteName,
         return WN_MORE_DATA;
       }
       RemoteName[0] = L'\\';
-      CopyMemory(&RemoteName[1], dokanMountPointInfo[i].UNCName, len);
+      // The declared size `len` already accounts for the leading '\' and the
+      // trailing NUL. Copying `len` bytes after RemoteName[0] would write one
+      // WCHAR past the caller's buffer (textil#2198).
+      CopyMemory(&RemoteName[1], dokanMountPointInfo[i].UNCName,
+                 (lstrlenW(dokanMountPointInfo[i].UNCName) + 1) *
+                     sizeof(WCHAR));
       *BufferSize = len;
       DokanReleaseMountPointList(dokanMountPointInfo);
       return WN_SUCCESS;

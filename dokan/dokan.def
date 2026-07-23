@@ -39,3 +39,5 @@ DokanRequestUnmount @33
 DokanCreateFileSystemEx @34
 DokanGetRuntimeIdentity @35
 DokanPrepareDriverUnload @36
+DokanGetMountQuota @37
+DokanSetMountQuota @38

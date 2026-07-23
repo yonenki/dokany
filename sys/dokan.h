@@ -186,6 +186,12 @@ typedef struct _DOKAN_GLOBAL {
   volatile LONG GlobalControlHandleCount;
   volatile LONG GlobalControlTeardownClaimed;
 
+  // Current number of mounted DCBs and the optional mount quota
+  // (0 = unlimited). MountQuotaMax is read from the registry at driver load
+  // and can be changed at runtime by administrators via FSCTL_SET_MOUNT_QUOTA.
+  volatile LONG MountCount;
+  volatile LONG MountQuotaMax;
+
   // Global IRP timeout scanner state. A single system thread periodically
   // runs ReleaseTimeoutPendingIrp for every mounted DCB, instead of having
   // one thread per mount. AllDcbList is protected by Resource (shared while
@@ -248,6 +254,8 @@ typedef struct _DokanDiskControlBlock {
   // Link into DOKAN_GLOBAL's AllDcbList used by the global timeout scanner.
   // Inserted when the volume mounts, removed before the DCB is deleted.
   LIST_ENTRY AllDcbListEntry;
+  // Whether this DCB is included in DOKAN_GLOBAL's MountCount.
+  BOOLEAN MountCounted;
   KEVENT ReleaseEvent;
 
   // the thread to deal with event notification

@@ -97,6 +97,17 @@ with this program. If not, see <http://www.gnu.org/licenses/>.
 #define FSCTL_PREPARE_UNLOAD                                                   \
   CTL_CODE(FILE_DEVICE_FILE_SYSTEM, 0x816, METHOD_BUFFERED, FILE_ANY_ACCESS)
 
+// Query the maximum number of concurrently mounted volumes.
+// 0 means no quota. Output is a LONG.
+#define FSCTL_GET_MOUNT_QUOTA                                                  \
+  CTL_CODE(FILE_DEVICE_FILE_SYSTEM, 0x817, METHOD_BUFFERED, FILE_ANY_ACCESS)
+
+// Set the maximum number of concurrently mounted volumes. Requires
+// administrative privileges (SE_INCREASE_QUOTA_PRIVILEGE). Input is a LONG;
+// 0 disables the quota.
+#define FSCTL_SET_MOUNT_QUOTA                                                  \
+  CTL_CODE(FILE_DEVICE_FILE_SYSTEM, 0x818, METHOD_BUFFERED, FILE_ANY_ACCESS)
+
 #define DOKAN_DRIVER_CAPABILITY_DISPATCH_READY (1ULL << 0)
 #define DOKAN_DRIVER_CAPABILITY_START_CANCELLATION (1ULL << 1)
 #define DOKAN_DRIVER_CAPABILITY_MOUNT_MANAGER_STATUS (1ULL << 2)
@@ -502,6 +513,9 @@ typedef struct _EVENT_INFORMATION {
 // Mount Manager failed to record a directory mount point after its reparse
 // point was created.
 #define DOKAN_DRIVER_INFO_MOUNT_POINT_NOTIFICATION_FAILED 128
+
+// The mount was rejected because the configured mount quota was reached.
+#define DOKAN_DRIVER_INFO_MOUNT_QUOTA_EXCEEDED 256
 
 typedef struct _EVENT_DRIVER_INFO {
   ULONG DriverVersion;

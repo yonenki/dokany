@@ -165,13 +165,34 @@ if ($out -match 'final: mounted=(\d+) fail=(\d+)') {
     } else {
         Add-Result 'Scaling-2205' 'FAIL' "only $mounted/$ScalingMounts mounted ($perMount threads/mount)"
     }
-    if ($mounted -ge 30) {
-        Add-Result 'MountQuota-2199' 'XFAIL' "no mount quota exists: $mounted volumes were mounted without restriction (tracked in textil#2199)"
-    } else {
-        Add-Result 'MountQuota-2199' 'XPASS' 'a mount quota appears to be in place; update the test to PASS'
-    }
 } else {
     Add-Result 'Scaling-2205' 'FAIL' "mountmany produced no result: $($out.Trim())"
+}
+
+# ------------------------------------------------- #2199 mount quota enforcement
+$dokanctlExe = "$PSScriptRoot\..\..\..\dokan_control\x64\Release\dokanctl.exe"
+if (-not (Test-Path $dokanctlExe)) {
+    Add-Result 'MountQuota-2199' 'SKIP' "dokanctl not found at $dokanctlExe"
+} else {
+    Copy-Item "$BinDir\dokan2.dll" (Split-Path $dokanctlExe) -Force -ErrorAction SilentlyContinue
+    $quotaOk = $false
+    try {
+        & $dokanctlExe /o 3 | Out-Null
+        Remove-Item "$BinDir\mountmany.out" -Force -ErrorAction SilentlyContinue
+        $mm = Start-Process -PassThru -FilePath "$BinDir\mountmany.exe" -ArgumentList '5','1','5000' `
+            -RedirectStandardOutput "$BinDir\mountmany.out" -RedirectStandardError "$BinDir\mountmany.err" -WindowStyle Hidden
+        $mm | Wait-Process -Timeout 300 -ErrorAction SilentlyContinue
+        $out = Get-Content "$BinDir\mountmany.out" -Raw -ErrorAction SilentlyContinue
+        $overLimit = $out -match 'final: mounted=3 fail=2' -and $out -match 'failed rc=-10'
+    } finally {
+        & $dokanctlExe /o 0 | Out-Null
+    }
+    Stop-TestProcesses
+    if ($overLimit -and (Assert-NoNewBugcheck 'MountQuota-2199')) {
+        Add-Result 'MountQuota-2199' 'PASS' 'mounts beyond the configured quota are cleanly rejected with DOKAN_MOUNT_QUOTA_ERROR'
+    } else {
+        Add-Result 'MountQuota-2199' 'FAIL' "quota not enforced as expected: $($out.Trim())"
+    }
 }
 
 # ---------------------------------------------------------------- #2198
@@ -185,9 +206,9 @@ if (Test-Path $DokanNpDll) {
         if ($out -match 'SKIP') {
             Add-Result 'NpGetConnection-2198' 'SKIP' $out.Trim()
         } elseif ($out -match 'OOB write confirmed') {
-            Add-Result 'NpGetConnection-2198' 'XFAIL' 'NPGetConnection still writes 2 bytes past the caller buffer (tracked in textil#2198)'
+            Add-Result 'NpGetConnection-2198' 'FAIL' 'NPGetConnection writes past the caller buffer'
         } elseif ($out -match 'no OOB write') {
-            Add-Result 'NpGetConnection-2198' 'XPASS' 'NPGetConnection OOB write is fixed; flip this test to PASS'
+            Add-Result 'NpGetConnection-2198' 'PASS' 'NPGetConnection stays within the declared buffer size'
         } else {
             Add-Result 'NpGetConnection-2198' 'FAIL' "unexpected output: $($out.Trim())"
         }

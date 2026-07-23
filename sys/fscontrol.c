@@ -426,6 +426,35 @@ DokanGlobalUserFsRequest(__in PREQUEST_CONTEXT RequestContext) {
       return STATUS_SUCCESS;
     };
 
+    case FSCTL_GET_MOUNT_QUOTA: {
+      PLONG quotaMax;
+      if (!PREPARE_OUTPUT(RequestContext->Irp, quotaMax,
+                          /*SetInformationOnFailure=*/FALSE)) {
+        return STATUS_BUFFER_TOO_SMALL;
+      }
+      *quotaMax = RequestContext->DokanGlobal->MountQuotaMax;
+      return STATUS_SUCCESS;
+    }
+
+    case FSCTL_SET_MOUNT_QUOTA: {
+#ifndef SE_INCREASE_QUOTA_PRIVILEGE
+#define SE_INCREASE_QUOTA_PRIVILEGE (5L)
+#endif
+      LUID increaseQuota = {SE_INCREASE_QUOTA_PRIVILEGE, 0};
+      if (!SePrivilegeCheck(&increaseQuota, NULL,
+                            RequestContext->Irp->RequestorMode)) {
+        return STATUS_PRIVILEGE_NOT_HELD;
+      }
+      PLONG newQuota;
+      GET_IRP_BUFFER_OR_RETURN(RequestContext->Irp, newQuota);
+      if (*newQuota < 0) {
+        return STATUS_INVALID_PARAMETER;
+      }
+      DOKAN_LOG_FINE_IRP(RequestContext, "Set mount quota: %ld", *newQuota);
+      RequestContext->DokanGlobal->MountQuotaMax = *newQuota;
+      return STATUS_SUCCESS;
+    }
+
     case FSCTL_EVENT_RELEASE:
       return DokanGlobalEventRelease(RequestContext);
 

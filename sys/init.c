@@ -355,6 +355,32 @@ VOID DokanUnregisterFileSystems(__in PDOKAN_GLOBAL dokanGlobal) {
   IoUnregisterFileSystem(dokanGlobal->FsCdDeviceObject);
 }
 
+// Reads the optional MountQuotaMax value from the driver's Parameters
+// registry key. Absent or unreadable values leave the quota disabled (0).
+#ifndef RTL_REGISTRY_SERVICES_KEY
+#define RTL_REGISTRY_SERVICES_KEY 1
+#endif
+VOID DokanReadMountQuotaFromRegistry(__in PDOKAN_GLOBAL dokanGlobal) {
+  RTL_QUERY_REGISTRY_TABLE queryTable[2] = {0};
+  ULONG quotaMax = 0;
+
+  queryTable[0].Flags = RTL_QUERY_REGISTRY_DIRECT;
+  queryTable[0].Name = L"MountQuotaMax";
+  queryTable[0].EntryContext = &quotaMax;
+  queryTable[0].DefaultType = REG_DWORD;
+  queryTable[0].DefaultData = &quotaMax;
+  queryTable[0].DefaultLength = sizeof(quotaMax);
+
+  NTSTATUS status =
+      RtlQueryRegistryValues(RTL_REGISTRY_SERVICES_KEY,
+                             DOKAN_DIST_DRIVER_SERVICE_W L"\\Parameters",
+                             queryTable, NULL, NULL);
+  if (NT_SUCCESS(status) && quotaMax > 0) {
+    DOKAN_LOG_("Mount quota loaded from registry: %lu", quotaMax);
+    dokanGlobal->MountQuotaMax = (LONG)quotaMax;
+  }
+}
+
 NTSTATUS DokanRegisterGlobalControlHandle(__in PDOKAN_GLOBAL dokanGlobal) {
   NTSTATUS status = STATUS_SUCCESS;
 
@@ -819,6 +845,8 @@ DokanCreateGlobalDiskDevice(__in PDRIVER_OBJECT DriverObject,
   dokanGlobal->FileSystemsRegistered = FALSE;
   dokanGlobal->GlobalControlHandleCount = 0;
   dokanGlobal->GlobalControlTeardownClaimed = FALSE;
+  dokanGlobal->MountCount = 0;
+  DokanReadMountQuotaFromRegistry(dokanGlobal);
   DokanStartDeleteDeviceThread(dokanGlobal);
   DokanStartTimeoutScanThread(dokanGlobal);
   //
@@ -1329,6 +1357,10 @@ VOID DokanDeleteDeviceObject(__in_opt PREQUEST_CONTEXT RequestContext,
   if (!IsListEmpty(&Dcb->AllDcbListEntry)) {
     RemoveEntryList(&Dcb->AllDcbListEntry);
     InitializeListHead(&Dcb->AllDcbListEntry);
+  }
+  if (Dcb->MountCounted) {
+    Dcb->MountCounted = FALSE;
+    InterlockedDecrement(&Dcb->Global->MountCount);
   }
   ExReleaseResourceLite(&Dcb->Global->Resource);
 

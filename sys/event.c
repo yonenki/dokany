@@ -970,6 +970,29 @@ DokanEventStart(__in PREQUEST_CONTEXT RequestContext) {
     return STATUS_SUCCESS;
   }
 
+  // Enforce the optional mount quota before creating any device. The global
+  // Resource is held exclusively at this point and MountCount is only
+  // incremented under the same lock below, so the check is race-free.
+  LONG quotaMax = RequestContext->DokanGlobal->MountQuotaMax;
+  if (quotaMax > 0 && RequestContext->DokanGlobal->MountCount >= quotaMax) {
+    DokanLogInfo(&logger,
+                 L"Rejecting mount: quota of %ld volumes is already reached.",
+                 quotaMax);
+    driverInfo->DriverVersion = DOKAN_DRIVER_VERSION;
+    driverInfo->Status = DOKAN_START_FAILED;
+    driverInfo->Flags |= DOKAN_DRIVER_INFO_MOUNT_QUOTA_EXCEEDED;
+    RequestContext->Irp->IoStatus.Status = STATUS_SUCCESS;
+    RequestContext->Irp->IoStatus.Information = sizeof(EVENT_DRIVER_INFO);
+    if (foundPrevEntry) {
+      ExReleaseResourceLite(&foundPrevEntry->Resource);
+    }
+    ExReleaseResourceLite(&RequestContext->DokanGlobal->Resource);
+    KeLeaveCriticalRegion();
+    ExFreePool(eventStart);
+    ExFreePool(baseGuidString);
+    return STATUS_SUCCESS;
+  }
+
   status = ExUuidCreate(&volumeGuid);
   if (!NT_SUCCESS(status)) {
     if (foundPrevEntry) {
@@ -1123,6 +1146,8 @@ DokanEventStart(__in PREQUEST_CONTEXT RequestContext) {
                          L"Failed to allocate new mount entry.");
   }
   DokanLogInfo(&logger, L"Inserted new mount entry.");
+  dcb->MountCounted = TRUE;
+  InterlockedIncrement(&RequestContext->DokanGlobal->MountCount);
 
   dcb->FileLockInUserMode = fileLockUserMode;
   // Record the file system host process so that the restricted event-channel
