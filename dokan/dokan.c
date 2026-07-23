@@ -435,6 +435,14 @@ GetEventInfoSize(__in ULONG MajorFunction, __in PEVENT_INFORMATION EventInfo) {
     // is the "bytes written" value as opposed to the reply size.
     return sizeof(EVENT_INFORMATION);
   }
+  if (EventInfo->Status == STATUS_BUFFER_OVERFLOW) {
+    // For buffer overflow replies, the BufferLength is the needed length and
+    // not the used length. The reply buffer was only allocated for the
+    // requestor's original buffer size, so sending FIELD_OFFSET + BufferLength
+    // bytes would read past the allocation. Mirror the kernel-side behavior
+    // and only ship the header.
+    return sizeof(EVENT_INFORMATION);
+  }
   return (DWORD)max((ULONG)sizeof(EVENT_INFORMATION),
                     FIELD_OFFSET(EVENT_INFORMATION, Buffer[0]) +
                         EventInfo->BufferLength);
