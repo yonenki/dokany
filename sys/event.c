@@ -771,6 +771,7 @@ VOID RemoveSessionDevices(__in PREQUEST_CONTEXT RequestContext,
 }
 
 // start event dispatching
+_IRQL_requires_(PASSIVE_LEVEL)
 NTSTATUS
 DokanEventStart(__in PREQUEST_CONTEXT RequestContext) {
   ULONG outBufferLen;
@@ -786,7 +787,7 @@ DokanEventStart(__in PREQUEST_CONTEXT RequestContext) {
   DEVICE_TYPE deviceType;
   ULONG deviceCharacteristics = 0;
   WCHAR *baseGuidString;
-  GUID baseGuid = DOKAN_BASE_GUID;
+  GUID volumeGuid;
   UNICODE_STRING unicodeGuid;
   ULONG deviceNamePos;
   BOOLEAN useMountManager = FALSE;
@@ -969,12 +970,20 @@ DokanEventStart(__in PREQUEST_CONTEXT RequestContext) {
     return STATUS_SUCCESS;
   }
 
-  baseGuid.Data2 =
-      (USHORT)(RequestContext->DokanGlobal->MountId & 0xFFFF) ^ baseGuid.Data2;
-  baseGuid.Data3 =
-      (USHORT)(RequestContext->DokanGlobal->MountId >> 16) ^ baseGuid.Data3;
+  status = ExUuidCreate(&volumeGuid);
+  if (!NT_SUCCESS(status)) {
+    if (foundPrevEntry) {
+      ExReleaseResourceLite(&foundPrevEntry->Resource);
+    }
+    ExReleaseResourceLite(&RequestContext->DokanGlobal->Resource);
+    KeLeaveCriticalRegion();
+    ExFreePool(eventStart);
+    ExFreePool(baseGuidString);
+    return DokanLogError(&logger, status,
+                         L"Failed to create a unique volume GUID.");
+  }
 
-  status = RtlStringFromGUID(&baseGuid, &unicodeGuid);
+  status = RtlStringFromGUID(&volumeGuid, &unicodeGuid);
   if (!NT_SUCCESS(status)) {
     if (foundPrevEntry) {
       ExReleaseResourceLite(&foundPrevEntry->Resource);

@@ -63,6 +63,12 @@ $driverPublicHeaderSource = Get-Content -Raw -LiteralPath (Join-Path $repository
 $dokanControlSource = Get-Content -Raw -LiteralPath (Join-Path $repositoryRoot 'dokan_control\dokanctl.c')
 $dokanExportsSource = Get-Content -Raw -LiteralPath (Join-Path $repositoryRoot 'dokan\dokan.def')
 Assert-True (
+    $driverEventSource.Contains('ExUuidCreate(&volumeGuid)')) `
+    'Volume device identities are not unique across driver reloads'
+Assert-True (
+    -not $driverEventSource.Contains('RequestContext->DokanGlobal->MountId & 0xFFFF')) `
+    'Volume device identities still reuse the per-load mount counter'
+Assert-True (
     $dokanRuntimeSource.Contains('NamespacePathsEqual(volumeName, finalGuidPath)')) `
     'Mount Manager readiness does not compare the assigned volume GUID with the handle GUID'
 Assert-True (

@@ -988,6 +988,7 @@ NTSTATUS
 DokanExceptionHandler(__in PDEVICE_OBJECT DeviceObject, __in PIRP Irp,
                       __in NTSTATUS ExceptionCode);
 
+_IRQL_requires_(PASSIVE_LEVEL)
 NTSTATUS
 DokanEventStart(__in PREQUEST_CONTEXT RequestContext);
 
