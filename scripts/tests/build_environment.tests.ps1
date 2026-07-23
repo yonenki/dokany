@@ -27,6 +27,32 @@ foreach ($projectMatch in $projectMatches) {
     $projectPath = Join-Path $repositoryRoot $projectMatch.Groups[1].Value
     $projectSource = Get-Content -Raw -LiteralPath $projectPath
     Assert-True ($projectSource.Contains('Dokan.props')) "$($projectMatch.Groups[1].Value) does not import the distribution profile properties"
+
+    [xml]$project = $projectSource
+    $namespaceManager = [System.Xml.XmlNamespaceManager]::new($project.NameTable)
+    $namespaceManager.AddNamespace('msbuild', 'http://schemas.microsoft.com/developer/msbuild/2003')
+    $includeDirectories = @($project.SelectNodes(
+            '//msbuild:ClCompile/msbuild:AdditionalIncludeDirectories',
+            $namespaceManager))
+    foreach ($includeDirectory in $includeDirectories) {
+        Assert-True (
+            $includeDirectory.InnerText.Contains('%(AdditionalIncludeDirectories)')) `
+            "$($projectMatch.Groups[1].Value) discards inherited compiler include directories"
+    }
 }
+
+[xml]$driverProject = Get-Content -Raw -LiteralPath (Join-Path $repositoryRoot 'sys\sys.vcxproj')
+$driverNamespaceManager = [System.Xml.XmlNamespaceManager]::new($driverProject.NameTable)
+$driverNamespaceManager.AddNamespace('msbuild', 'http://schemas.microsoft.com/developer/msbuild/2003')
+$localProperties = @($driverProject.Project.TreatAsLocalProperty -split ';')
+Assert-True ($localProperties -contains 'PlatformToolset') 'The driver project allows solution-level PlatformToolset to replace the WDK toolset'
+$driverToolsets = @($driverProject.SelectNodes(
+        '//msbuild:PropertyGroup[@Label="Configuration"]/msbuild:PlatformToolset',
+        $driverNamespaceManager) |
+    ForEach-Object { $_.InnerText } |
+    Select-Object -Unique)
+Assert-True (
+    $driverToolsets.Count -eq 1 -and $driverToolsets[0] -ceq 'WindowsKernelModeDriver10.0') `
+    'The driver project does not consistently select the WDK kernel-mode toolset'
 
 Write-Host 'Build environment tests passed.'
