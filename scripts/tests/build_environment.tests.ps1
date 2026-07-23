@@ -50,6 +50,13 @@ try {
 }
 
 $repositoryRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..'))
+$dokanRuntimeSource = Get-Content -Raw -LiteralPath (Join-Path $repositoryRoot 'dokan\dokan.c')
+Assert-True (
+    $dokanRuntimeSource.Contains('NamespacePathsEqual(volumeName, finalGuidPath)')) `
+    'Mount Manager readiness does not compare the assigned volume GUID with the handle GUID'
+Assert-True (
+    -not $dokanRuntimeSource.Contains('NamespacePathsEqual(expectedVolumeName, finalGuidPath)')) `
+    'Mount Manager readiness still compares an internal device GUID with the assigned volume GUID'
 $solutionSource = Get-Content -Raw -LiteralPath (Join-Path $repositoryRoot 'dokan.sln')
 $projectMatches = [regex]::Matches($solutionSource, '"([^"\r\n]+\.vcxproj)"')
 Assert-True ($projectMatches.Count -gt 0) 'dokan.sln contains no C++ projects'

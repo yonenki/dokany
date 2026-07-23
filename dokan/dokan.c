@@ -774,7 +774,6 @@ static BOOL NamespacePathsEqual(_In_ LPCWSTR Left, _In_ LPCWSTR Right) {
 static BOOL ProbeMountManagerNamespace(_In_ PDOKAN_INSTANCE DokanInstance) {
   WCHAR mountPoint[MAX_PATH + 2];
   WCHAR volumeName[MAX_PATH];
-  WCHAR expectedVolumeName[128];
   WCHAR finalGuidPath[MAX_PATH * 2];
   WCHAR finalDosPath[MAX_PATH * 2];
 
@@ -803,8 +802,6 @@ static BOOL ProbeMountManagerNamespace(_In_ PDOKAN_INSTANCE DokanInstance) {
     return FALSE;
   }
 
-  StringCchPrintfW(expectedVolumeName, ARRAYSIZE(expectedVolumeName),
-                   L"\\\\?%s", DokanInstance->DeviceName);
   DWORD finalGuidPathLength = GetFinalPathNameByHandleW(
       mountHandle, finalGuidPath, ARRAYSIZE(finalGuidPath),
       FILE_NAME_NORMALIZED | VOLUME_NAME_GUID);
@@ -812,7 +809,7 @@ static BOOL ProbeMountManagerNamespace(_In_ PDOKAN_INSTANCE DokanInstance) {
   DWORD finalDosPathLength = 0;
   if (finalGuidPathLength &&
       finalGuidPathLength < ARRAYSIZE(finalGuidPath) &&
-      NamespacePathsEqual(expectedVolumeName, finalGuidPath)) {
+      NamespacePathsEqual(volumeName, finalGuidPath)) {
     finalDosPathLength = GetFinalPathNameByHandleW(
         mountHandle, finalDosPath, ARRAYSIZE(finalDosPath),
         FILE_NAME_NORMALIZED | VOLUME_NAME_DOS);
