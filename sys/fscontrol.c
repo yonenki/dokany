@@ -925,8 +925,6 @@ NTSTATUS DokanMountVolume(__in PREQUEST_CONTEXT RequestContext) {
   ClearLongFlag(volDeviceObject->Flags, DO_DEVICE_INITIALIZING);
   SetLongFlag(vcb->Flags, VCB_MOUNTED);
 
-  ObReferenceObject(volDeviceObject);
-
   DOKAN_LOG_FINE_IRP(RequestContext, "ExAcquireResourceExclusiveLite dcb resource");
   ExAcquireResourceExclusiveLite(&dcb->Resource, TRUE);
 

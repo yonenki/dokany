@@ -701,8 +701,6 @@ DokanCreateGlobalDiskDevice(__in PDRIVER_OBJECT DriverObject,
   }
   DOKAN_LOG_("DokanCdFileSystemDevice: \"%wZ\" created", &fsCdDeviceName);
 
-  ObReferenceObject(deviceObject);
-
   status = IoCreateSymbolicLink(&symbolicLinkName, &deviceName);
   if (!NT_SUCCESS(status)) {
     DOKAN_LOG_("IoCreateSymbolicLink returned 0x%x %s", status,
@@ -757,9 +755,6 @@ DokanCreateGlobalDiskDevice(__in PDRIVER_OBJECT DriverObject,
   // Register file systems
   IoRegisterFileSystem(fsDiskDeviceObject);
   IoRegisterFileSystem(fsCdDeviceObject);
-
-  ObReferenceObject(fsDiskDeviceObject);
-  ObReferenceObject(fsCdDeviceObject);
 
   *DokanGlobal = dokanGlobal;
   return STATUS_SUCCESS;
@@ -1140,8 +1135,6 @@ DokanCreateDiskDevice(__in PDRIVER_OBJECT DriverObject, __in ULONG MountId,
 
     // Mark devices as initialized
     diskDeviceObject->Flags &= ~DO_DEVICE_INITIALIZING;
-
-    ObReferenceObject(diskDeviceObject);
 
     // Prepare the DOKAN_CONTROL struct that the caller will add to the mount
     // list.

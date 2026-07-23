@@ -53,6 +53,7 @@ $repositoryRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..'
 $dokanRuntimeSource = Get-Content -Raw -LiteralPath (Join-Path $repositoryRoot 'dokan\dokan.c')
 $driverHeaderSource = Get-Content -Raw -LiteralPath (Join-Path $repositoryRoot 'sys\dokan.h')
 $driverInitializationSource = Get-Content -Raw -LiteralPath (Join-Path $repositoryRoot 'sys\init.c')
+$driverFileSystemControlSource = Get-Content -Raw -LiteralPath (Join-Path $repositoryRoot 'sys\fscontrol.c')
 Assert-True (
     $dokanRuntimeSource.Contains('NamespacePathsEqual(volumeName, finalGuidPath)')) `
     'Mount Manager readiness does not compare the assigned volume GUID with the handle GUID'
@@ -76,6 +77,19 @@ $deleteDiskDeviceIndex = $driverInitializationSource.IndexOf('IoDeleteDevice(dev
 Assert-True (
     $clearVpbIndex -ge 0 -and $deleteDiskDeviceIndex -gt $clearVpbIndex) `
     'Delayed deletion accesses the disk device VPB after IoDeleteDevice'
+foreach ($ownedDeviceReference in @(
+        'ObReferenceObject(deviceObject);',
+        'ObReferenceObject(fsDiskDeviceObject);',
+        'ObReferenceObject(fsCdDeviceObject);',
+        'ObReferenceObject(diskDeviceObject);'
+    )) {
+    Assert-True (
+        -not $driverInitializationSource.Contains($ownedDeviceReference)) `
+        "Driver initialization leaks its owned device reference: $ownedDeviceReference"
+}
+Assert-True (
+    -not $driverFileSystemControlSource.Contains('ObReferenceObject(volDeviceObject);')) `
+    'Volume mounting leaks its owned volume-device reference'
 $solutionSource = Get-Content -Raw -LiteralPath (Join-Path $repositoryRoot 'dokan.sln')
 $projectMatches = [regex]::Matches($solutionSource, '"([^"\r\n]+\.vcxproj)"')
 Assert-True ($projectMatches.Count -gt 0) 'dokan.sln contains no C++ projects'
