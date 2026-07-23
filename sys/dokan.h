@@ -183,6 +183,8 @@ typedef struct _DOKAN_GLOBAL {
   KEVENT DeleteDeviceEvent;
   volatile LONG UnloadPending;
   volatile LONG FileSystemsRegistered;
+  volatile LONG GlobalControlHandleCount;
+  volatile LONG GlobalControlTeardownClaimed;
 
   ULONG DriverVersion;
   
@@ -802,6 +804,9 @@ typedef struct _REQUEST_CONTEXT {
 
   // Whether if we are the top-level IRP.
   BOOLEAN IsTopLevelIrp;
+
+  // The final prepared close owns global control-device teardown.
+  BOOLEAN DeleteGlobalDevicesAfterDispatch;
 } REQUEST_CONTEXT, *PREQUEST_CONTEXT;
 
 // IRP list which has pending status
@@ -1066,6 +1071,12 @@ DokanCreateGlobalDiskDevice(__in PDRIVER_OBJECT DriverObject,
 VOID DokanStopDeleteDeviceThread(__in PDOKAN_GLOBAL DokanGlobal);
 
 VOID DokanUnregisterFileSystems(__in PDOKAN_GLOBAL DokanGlobal);
+
+NTSTATUS DokanRegisterGlobalControlHandle(__in PDOKAN_GLOBAL DokanGlobal);
+
+BOOLEAN DokanReleaseGlobalControlHandle(__in PDOKAN_GLOBAL DokanGlobal);
+
+VOID DokanCleanupGlobalDiskDevice(__in PDOKAN_GLOBAL DokanGlobal);
 
 NTSTATUS DokanPrepareForUnload(__in PDOKAN_GLOBAL DokanGlobal);
 

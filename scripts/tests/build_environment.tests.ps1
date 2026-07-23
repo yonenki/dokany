@@ -54,6 +54,9 @@ $dokanRuntimeSource = Get-Content -Raw -LiteralPath (Join-Path $repositoryRoot '
 $driverRuntimeSource = Get-Content -Raw -LiteralPath (Join-Path $repositoryRoot 'sys\dokan.c')
 $driverHeaderSource = Get-Content -Raw -LiteralPath (Join-Path $repositoryRoot 'sys\dokan.h')
 $driverInitializationSource = Get-Content -Raw -LiteralPath (Join-Path $repositoryRoot 'sys\init.c')
+$driverCreateSource = Get-Content -Raw -LiteralPath (Join-Path $repositoryRoot 'sys\create.c')
+$driverCloseSource = Get-Content -Raw -LiteralPath (Join-Path $repositoryRoot 'sys\close.c')
+$driverDispatchSource = Get-Content -Raw -LiteralPath (Join-Path $repositoryRoot 'sys\dispatch.c')
 $driverFileSystemControlSource = Get-Content -Raw -LiteralPath (Join-Path $repositoryRoot 'sys\fscontrol.c')
 $driverEventSource = Get-Content -Raw -LiteralPath (Join-Path $repositoryRoot 'sys\event.c')
 $driverPublicHeaderSource = Get-Content -Raw -LiteralPath (Join-Path $repositoryRoot 'sys\public.h')
@@ -109,10 +112,6 @@ $deleteGlobalDeviceIndex = $driverRuntimeSource.IndexOf('IoDeleteDevice(dokanGlo
 Assert-True (
     $stopDeleteThreadIndex -ge 0 -and $deleteGlobalDeviceIndex -gt $stopDeleteThreadIndex) `
     'Global teardown deletes the worker context before the device-deletion thread stops'
-Assert-True (
-    $driverRuntimeSource.Contains('deviceObject = deviceObject->NextDevice') -and
-    $driverRuntimeSource.Contains('deviceObject->DeviceExtension != NULL')) `
-    'Driver unload assumes the first device object owns the global extension'
 $deleteGlobalResourceIndex =
     $driverRuntimeSource.IndexOf('ExDeleteResourceLite(&dokanGlobal->Resource)')
 Assert-True (
@@ -138,6 +137,25 @@ Assert-True (
     $driverInitializationSource.Contains('IsListEmpty(&dokanGlobal->DeviceDeleteList)') -and
     $driverInitializationSource.Contains('DokanUnregisterFileSystems(dokanGlobal)')) `
     'Unload preparation does not require empty mount state before unregistering the file system'
+Assert-True (
+    $driverHeaderSource.Contains('volatile LONG GlobalControlHandleCount;') -and
+    $driverHeaderSource.Contains('volatile LONG GlobalControlTeardownClaimed;')) `
+    'Global control handles and one-shot teardown ownership are not modeled explicitly'
+Assert-True (
+    $driverCreateSource.Contains('DokanRegisterGlobalControlHandle(RequestContext->DokanGlobal)') -and
+    $driverCloseSource.Contains('DokanReleaseGlobalControlHandle(RequestContext->DokanGlobal)')) `
+    'Global control create and close do not participate in unload lifecycle ownership'
+Assert-True (
+    $driverInitializationSource.Contains('dokanGlobal->GlobalControlHandleCount != 1') -and
+    $driverInitializationSource.Contains('&dokanGlobal->GlobalControlTeardownClaimed')) `
+    'Unload preparation can commit while foreign global handles exist or teardown can run twice'
+Assert-True (
+    $driverDispatchSource.Contains('CleanupGlobalDiskDevice(globalToDelete)')) `
+    'The last prepared global close does not delete control devices after request logging finishes'
+Assert-True (
+    -not $driverRuntimeSource.Contains('deviceObject = DriverObject->DeviceObject') -and
+    $driverRuntimeSource.Contains('ASSERT(DriverObject->DeviceObject == NULL)')) `
+    'DriverUnload still owns device deletion instead of requiring prepared close teardown'
 Assert-True (
     $dokanRuntimeSource.Contains('DokanPrepareDriverUnload') -and
     $dokanControlSource.Contains("case L'p':") -and

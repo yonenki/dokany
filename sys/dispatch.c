@@ -227,5 +227,10 @@ DokanDispatchRequest(__in PDEVICE_OBJECT DeviceObject, __in PIRP Irp,
   } __finally {
     DOKAN_LOG_END_MJ((&requestContext), status);
   }
+  if (requestContext.DeleteGlobalDevicesAfterDispatch) {
+    PDOKAN_GLOBAL globalToDelete = requestContext.DokanGlobal;
+    requestContext.DokanGlobal = NULL;
+    DokanCleanupGlobalDiskDevice(globalToDelete);
+  }
   return status;
 }

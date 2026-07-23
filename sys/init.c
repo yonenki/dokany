@@ -356,6 +356,33 @@ VOID DokanUnregisterFileSystems(__in PDOKAN_GLOBAL dokanGlobal) {
   IoUnregisterFileSystem(dokanGlobal->FsCdDeviceObject);
 }
 
+NTSTATUS DokanRegisterGlobalControlHandle(__in PDOKAN_GLOBAL dokanGlobal) {
+  NTSTATUS status = STATUS_SUCCESS;
+
+  KeEnterCriticalRegion();
+  ExAcquireResourceSharedLite(&dokanGlobal->Resource, TRUE);
+  if (dokanGlobal->UnloadPending) {
+    status = STATUS_DELETE_PENDING;
+  } else {
+    InterlockedIncrement(&dokanGlobal->GlobalControlHandleCount);
+  }
+  ExReleaseResourceLite(&dokanGlobal->Resource);
+  KeLeaveCriticalRegion();
+  return status;
+}
+
+BOOLEAN DokanReleaseGlobalControlHandle(__in PDOKAN_GLOBAL dokanGlobal) {
+  LONG remainingHandles =
+      InterlockedDecrement(&dokanGlobal->GlobalControlHandleCount);
+  ASSERT(remainingHandles >= 0);
+  if (remainingHandles != 0 || !dokanGlobal->UnloadPending) {
+    return FALSE;
+  }
+
+  return InterlockedCompareExchange(
+             &dokanGlobal->GlobalControlTeardownClaimed, TRUE, FALSE) == FALSE;
+}
+
 NTSTATUS DokanPrepareForUnload(__in PDOKAN_GLOBAL dokanGlobal) {
   NTSTATUS status = STATUS_SUCCESS;
 
@@ -366,7 +393,8 @@ NTSTATUS DokanPrepareForUnload(__in PDOKAN_GLOBAL dokanGlobal) {
 
   if (!dokanGlobal->UnloadPending &&
       (!IsListEmpty(&dokanGlobal->MountPointList) ||
-       !IsListEmpty(&dokanGlobal->DeviceDeleteList))) {
+       !IsListEmpty(&dokanGlobal->DeviceDeleteList) ||
+       dokanGlobal->GlobalControlHandleCount != 1)) {
     status = STATUS_DEVICE_BUSY;
   } else {
     InterlockedExchange(&dokanGlobal->UnloadPending, TRUE);
@@ -784,6 +812,8 @@ DokanCreateGlobalDiskDevice(__in PDRIVER_OBJECT DriverObject,
                     FALSE);
   dokanGlobal->UnloadPending = FALSE;
   dokanGlobal->FileSystemsRegistered = FALSE;
+  dokanGlobal->GlobalControlHandleCount = 0;
+  dokanGlobal->GlobalControlTeardownClaimed = FALSE;
   DokanStartDeleteDeviceThread(dokanGlobal);
   //
   // Request direct I/O user-buffer access method.
