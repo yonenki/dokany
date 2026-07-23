@@ -76,6 +76,11 @@ finally {
     Remove-Item -LiteralPath $catalogTestRoot -Recurse -Force
 }
 
+Remove-Module distribution_development_signing, distribution_artifacts -Force -ErrorAction SilentlyContinue
+Import-Module $artifactModulePath -Force
+Import-Module $signingModulePath -Force
+Assert-True ($null -ne (Get-Command Get-DistributionBuildContext -ErrorAction SilentlyContinue)) 'Importing signing support removes the artifact-path API required by packaging'
+
 $certificateSource = Get-Content -Raw -LiteralPath $certificateScriptPath
 Assert-True ($certificateSource.Contains('TrustForTestMachine')) 'Certificate creation does not require an explicit trust intent'
 Assert-True ($certificateSource.Contains("Cert:\LocalMachine\Root")) 'Certificate is not installed in LocalMachine Root'
