@@ -156,7 +156,7 @@ public static class DistributionProfileGenerator
         PnpLockdown       = 1
 
         [DestinationDirs]
-        DefaultDestDir = 13
+        DefaultDestDir = 12
 
         [DefaultInstall.NTamd64]
         CopyFiles = DokanFileSystem.DriverFiles
@@ -173,7 +173,7 @@ public static class DistributionProfileGenerator
         [DokanFileSystem.Service]
         DisplayName    = %ServiceDisplayName%
         Description    = %ServiceDescription%
-        ServiceBinary  = %13%\%DriverName%.sys
+        ServiceBinary  = %12%\%DriverName%.sys
         ServiceType    = 2
         StartType      = 3
         ErrorControl   = 1

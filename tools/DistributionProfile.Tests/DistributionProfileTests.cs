@@ -78,8 +78,8 @@ public sealed class DistributionProfileTests
         Assert.Contains("[DefaultInstall.NTarm64]", output.Inf, StringComparison.Ordinal);
         Assert.Contains("[DefaultInstall.NTarm64.Services]", output.Inf, StringComparison.Ordinal);
         Assert.Contains("AddService = %ServiceName%,,DokanFileSystem.Service", output.Inf);
-        Assert.Contains("DefaultDestDir = 13", output.Inf);
-        Assert.Contains("ServiceBinary  = %13%\\%DriverName%.sys", output.Inf);
+        Assert.Contains("DefaultDestDir = 12", output.Inf);
+        Assert.Contains("ServiceBinary  = %12%\\%DriverName%.sys", output.Inf);
         Assert.Contains("ServiceType    = 2", output.Inf);
         Assert.Contains("StartType      = 3", output.Inf);
         Assert.Contains("ServiceName        = \"AcmeFs2\"", output.Inf);
